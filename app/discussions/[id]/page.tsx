@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { RichText } from "@/components/rich-text";
+import { ShareMenu } from "@/components/share-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -381,6 +382,7 @@ export default function DiscussionDetailPage() {
               />
               บุ๊คมาร์ค
             </Button>
+            <ShareMenu title={d.title} />
             <div className="ml-auto flex items-center gap-2">
               {canDelete && (
                 <Button

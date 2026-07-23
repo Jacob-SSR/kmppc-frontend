@@ -12,13 +12,13 @@ import {
   MessageCircle,
   Lock,
   Send,
-  Share2,
   ThumbsUp,
   Trash2,
   User,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { RichText } from "@/components/rich-text";
+import { ShareMenu } from "@/components/share-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,15 +142,6 @@ export default function ArticleDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["comments", article.data?.id] }),
     onError: (err) => handleAuthError(err, "กดถูกใจ"),
   });
-
-  async function share() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success("คัดลอกลิงก์แล้ว", "ส่งต่อให้เพื่อนร่วมงานได้เลย");
-    } catch {
-      toast.error("คัดลอกลิงก์ไม่สำเร็จ");
-    }
-  }
 
   function report() {
     const reason = window.prompt("โปรดระบุเหตุผลในการรายงานบทความนี้");
@@ -308,15 +299,7 @@ export default function ArticleDetailPage() {
                 />
                 บุ๊คมาร์ค
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={share}
-              >
-                <Share2 className="h-4 w-4" />
-                แชร์
-              </Button>
+              <ShareMenu title={a.title} />
               <div className="ml-auto flex items-center gap-2">
                 {canDelete && (
                   <Button
