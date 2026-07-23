@@ -231,7 +231,7 @@ export default function ChatPage() {
         "/upload",
         formData,
       );
-      const message = `📎 ${data.filename ?? file.name}\n${data.url}`;
+      const message = `[📎 ${data.filename ?? file.name}](${data.url})`;
       const socket = getChatSocket();
       let sent = false;
       if (socket.connected) {

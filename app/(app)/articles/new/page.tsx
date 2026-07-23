@@ -110,7 +110,7 @@ export default function NewArticlePage() {
     const body = content.trim();
     if (attachments.length === 0) return body;
     const lines = attachments
-      .map((a) => `📎 ${a.filename}: ${a.url}`)
+      .map((a) => `[📎 ${a.filename}](${a.url})`)
       .join("\n");
     return `${body}\n\nไฟล์แนบ:\n${lines}`;
   }
