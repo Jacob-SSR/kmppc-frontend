@@ -12,6 +12,7 @@ import {
   Eye,
   Flag,
   MessageCircle,
+  Lock,
   Send,
   ThumbsUp,
   Trash2,
@@ -210,6 +211,9 @@ export default function DiscussionDetailPage() {
     (me.data.role.role_name === "ADMIN" ||
       (!d.is_anonymous && d.author.id === me.data.id));
 
+  // ยังไม่ login (เช็คจาก /auth/me ที่ตอบ 401) — เห็นแค่หัวข้อ เนื้อหาและบทสนทนาถูกเบลอ
+  const isGuest = me.isError;
+
   const topLevelReplies = replies.filter((r) => !r.parent_reply_id);
   const childrenOf = (parentId: string) =>
     replies.filter((r) => r.parent_reply_id === parentId);
@@ -301,10 +305,46 @@ export default function DiscussionDetailPage() {
             </div>
           </div>
 
-          <p className="mt-5 whitespace-pre-line text-[15px] leading-relaxed">
-            {d.content}
-          </p>
+          {isGuest ? (
+            <div className="relative mt-5 overflow-hidden">
+              <div
+                className="pointer-events-none select-none blur-sm"
+                aria-hidden
+              >
+                <p className="whitespace-pre-line text-[15px] leading-relaxed">
+                  {d.content}
+                </p>
+                <div className="mt-4 space-y-3">
+                  {replies.slice(0, 2).map((r) => (
+                    <div key={r.id} className="rounded-xl bg-muted p-4 text-sm">
+                      {r.content}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 bg-gradient-to-b from-transparent via-background/70 to-background pb-4">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary">
+                  <Lock className="h-5 w-5 text-primary" />
+                </span>
+                <p className="text-center text-sm text-muted-foreground">
+                  เข้าสู่ระบบเพื่ออ่านเนื้อหาและบทสนทนาทั้งหมด ({replies.length}{" "}
+                  คำตอบ)
+                </p>
+                <Link href="/login">
+                  <Button variant="dark">
+                    <Lock className="h-4 w-4" />
+                    เข้าสู่ระบบเพื่ออ่านต่อ
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 whitespace-pre-line text-[15px] leading-relaxed">
+              {d.content}
+            </p>
+          )}
 
+          {!isGuest && (
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-4">
             <Button
               variant="ghost"
@@ -365,8 +405,11 @@ export default function DiscussionDetailPage() {
               </Button>
             </div>
           </div>
+          )}
         </Card>
 
+        {!isGuest && (
+        <>
         <h2 className="mt-8 flex items-center gap-2 font-bold">
           <MessageCircle className="h-5 w-5 text-primary" />
           {replies.length} คำตอบ
@@ -454,6 +497,8 @@ export default function DiscussionDetailPage() {
             </div>
           </form>
         </Card>
+        </>
+        )}
       </div>
     </PublicShell>
   );
