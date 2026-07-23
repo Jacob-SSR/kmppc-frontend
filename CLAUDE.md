@@ -7,5 +7,5 @@
 - ฟอนต์ IBM Plex Sans Thai ผ่าน `next/font` (ตัวแปร `--font-ibm-plex-thai`)
 - UI components อยู่ `components/ui/` (สไตล์ shadcn) — ใช้ `cn()` จาก `lib/utils.ts`
 - สีพิเศษ: `primary-dark` (ปุ่มหลัก/navbar/footer เขียวเข้ม), `ai` (ม่วงน้ำเงินสำหรับฟีเจอร์ AI)
-- ข้อมูล mock หน้าแรกอยู่ `lib/mock-data.ts` — จะแทนที่ด้วย API จริงภายหลัง
+- ข้อมูลทุกหน้าดึงจาก API จริงผ่าน hooks ใน `lib/queries.ts` (React Query) — ไม่มี mock data แล้ว
 - ก่อน commit: รัน `pnpm lint` + `pnpm build`

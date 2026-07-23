@@ -1,65 +1,79 @@
+"use client";
+
 import Link from "next/link";
 import {
   BookMarked,
   FileText,
   Flag,
+  LayoutGrid,
   MessagesSquare,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
-  adminReports,
-  adminUsers,
-  articles,
-  discussions,
-  knowledgeDocs,
-} from "@/lib/mock-data";
+  useAdminReports,
+  useAdminUsers,
+  useArticles,
+  useCategories,
+  useDiscussions,
+  useKnowledgeDocs,
+} from "@/lib/queries";
 
-// ภาพรวมผู้ดูแลระบบ — สรุปจากข้อมูล mock, จะเชื่อม API จริงในสปรินต์ถัดไป
 export default function AdminOverviewPage() {
+  const users = useAdminUsers({ limit: 1 });
+  const articles = useArticles({ limit: 1 });
+  const discussions = useDiscussions({ limit: 1 });
+  const docs = useKnowledgeDocs();
+  const reports = useAdminReports({ limit: 1 });
+  const pendingReports = useAdminReports({ limit: 1, status: "PENDING" });
+  const categories = useCategories();
+
+  const pendingDocs = (docs.data ?? []).filter(
+    (d) => d.index_status !== "DONE",
+  ).length;
+
   const stats = [
     {
       label: "ผู้ใช้งานทั้งหมด",
-      value: adminUsers.length,
-      sub: `ใช้งานอยู่ ${adminUsers.filter((u) => u.is_active).length} บัญชี`,
+      value: users.data?.total,
+      sub: "บัญชีในระบบทั้งหมด",
       icon: Users,
       href: "/admin/users",
     },
     {
       label: "บทความ",
-      value: articles.length,
+      value: articles.data?.total,
       sub: "เผยแพร่แล้วทั้งหมด",
       icon: FileText,
       href: "/articles",
     },
     {
       label: "กระทู้",
-      value: discussions.length,
-      sub: `แก้ไขแล้ว ${discussions.filter((d) => d.is_solved).length} กระทู้`,
+      value: discussions.data?.total,
+      sub: "กระทู้ถาม-ตอบทั้งหมด",
       icon: MessagesSquare,
       href: "/discussions",
     },
     {
       label: "เอกสารคลังความรู้ AI",
-      value: knowledgeDocs.length,
-      sub: `รอ index ${knowledgeDocs.filter((k) => k.index_status !== "DONE").length} รายการ`,
+      value: docs.data?.length,
+      sub: `รอ index ${pendingDocs} รายการ`,
       icon: BookMarked,
       href: "/admin/knowledge",
     },
     {
       label: "รายงานที่รอตรวจสอบ",
-      value: adminReports.filter((r) => r.status === "PENDING").length,
-      sub: `ทั้งหมด ${adminReports.length} รายการ`,
+      value: pendingReports.data?.total,
+      sub: `ทั้งหมด ${reports.data?.total ?? "…"} รายการ`,
       icon: Flag,
       href: "/admin/reports",
     },
     {
-      label: "การเข้าชมเดือนนี้",
-      value: "4,512",
-      sub: "+12% จากเดือนก่อน",
-      icon: TrendingUp,
-      href: "/admin",
+      label: "หมวดหมู่ความรู้",
+      value: categories.data?.length,
+      sub: "หมวดหมู่บทความและกระทู้",
+      icon: LayoutGrid,
+      href: "/articles",
     },
   ];
 
@@ -72,7 +86,9 @@ export default function AdminOverviewPage() {
               <s.icon className="h-5 w-5 text-primary" />
             </span>
             <div>
-              <p className="text-2xl font-bold leading-none">{s.value}</p>
+              <p className="text-2xl font-bold leading-none">
+                {s.value ?? "…"}
+              </p>
               <p className="mt-1.5 text-sm font-medium">{s.label}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{s.sub}</p>
             </div>

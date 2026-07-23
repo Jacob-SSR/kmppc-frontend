@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Bell,
   BookOpen,
+  Bookmark,
   CheckCircle2,
   Clock,
   Eye,
@@ -18,36 +19,52 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  articles,
-  currentUser,
-  discussions,
-  myArticles,
-  myDiscussions,
-  notifications,
-} from "@/lib/mock-data";
-
-// แดชบอร์ดผู้ใช้งาน — จะเชื่อม API จริง (articles/discussions/notifications) ในสปรินต์ถัดไป
-const stats = [
-  { label: "บทความของฉัน", value: myArticles.length, icon: FileText },
-  { label: "กระทู้ของฉัน", value: myDiscussions.length, icon: MessagesSquare },
-  {
-    label: "แจ้งเตือนที่ยังไม่อ่าน",
-    value: notifications.filter((n) => !n.is_read).length,
-    icon: Bell,
-  },
-  { label: "ยอดถูกใจที่ได้รับ", value: 46, icon: ThumbsUp },
-];
+  useArticles,
+  useBookmarks,
+  useDiscussions,
+  useMe,
+  useNotifications,
+} from "@/lib/queries";
+import { timeAgo } from "@/lib/format";
 
 export default function DashboardPage() {
+  const me = useMe();
+  const articles = useArticles({ limit: 50 });
+  const discussions = useDiscussions({ limit: 50 });
+  const bookmarks = useBookmarks();
+  const notifications = useNotifications({ limit: 1 });
+
+  // ยังไม่มี endpoint กรองตามผู้เขียน — กรองจากรายการเผยแพร่ล่าสุดฝั่ง client
+  const myArticles = (articles.data?.items ?? []).filter(
+    (a) => me.data && a.author.id === me.data.id,
+  );
+  const myDiscussions = (discussions.data?.items ?? []).filter(
+    (d) => me.data && !d.is_anonymous && d.author.id === me.data.id,
+  );
+  const myLikes = myArticles.reduce((s, a) => s + a._count.likes, 0);
+
+  const stats = [
+    { label: "บทความของฉัน", value: myArticles.length, icon: FileText },
+    { label: "กระทู้ของฉัน", value: myDiscussions.length, icon: MessagesSquare },
+    {
+      label: "แจ้งเตือนที่ยังไม่อ่าน",
+      value: notifications.data?.unread_count ?? 0,
+      icon: Bell,
+    },
+    { label: "บุ๊คมาร์คของฉัน", value: bookmarks.data?.length ?? 0, icon: Bookmark },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
-            สวัสดี, คุณ{currentUser.fname} 👋
+            สวัสดี, คุณ{me.data?.fname ?? "…"} 👋
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {currentUser.position} · {currentUser.department}
+            {me.data
+              ? `${me.data.position ?? ""} · ${me.data.department.dept_name}`
+              : "กำลังโหลดข้อมูลผู้ใช้..."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -86,11 +103,24 @@ export default function DashboardPage() {
           <h2 className="flex items-center gap-2 font-bold">
             <FileText className="h-5 w-5 text-primary" />
             บทความของฉัน
+            {myLikes > 0 && (
+              <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                <ThumbsUp className="h-3.5 w-3.5" /> ได้รับ {myLikes} ถูกใจ
+              </span>
+            )}
           </h2>
           <div className="mt-3 space-y-2">
-            {myArticles.map((a) => (
+            {myArticles.length === 0 && (
+              <p className="p-2.5 text-sm text-muted-foreground">
+                ยังไม่มีบทความที่เผยแพร่ —{" "}
+                <Link href="/articles/new" className="text-primary hover:underline">
+                  เริ่มเขียนบทความแรกเลย
+                </Link>
+              </p>
+            )}
+            {myArticles.slice(0, 5).map((a) => (
               <Link
-                key={a.slug}
+                key={a.id}
                 href={`/articles/${a.slug}`}
                 className="flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted"
               >
@@ -98,21 +128,18 @@ export default function DashboardPage() {
                   <p className="truncate text-sm font-medium">{a.title}</p>
                   <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Eye className="h-3 w-3" /> {a.views}
+                      <Eye className="h-3 w-3" /> {a.view_count}
                     </span>
                     <span className="flex items-center gap-1">
-                      <ThumbsUp className="h-3 w-3" /> {a.likes}
+                      <ThumbsUp className="h-3 w-3" /> {a._count.likes}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {a.time}
+                      <Clock className="h-3 w-3" />
+                      {timeAgo(a.published_at ?? a.created_at)}
                     </span>
                   </p>
                 </div>
-                <Badge
-                  variant={a.status === "PUBLISHED" ? "primary" : "outline"}
-                >
-                  {a.status === "PUBLISHED" ? "เผยแพร่แล้ว" : "ฉบับร่าง"}
-                </Badge>
+                <Badge variant="primary">เผยแพร่แล้ว</Badge>
               </Link>
             ))}
           </div>
@@ -122,7 +149,18 @@ export default function DashboardPage() {
             กระทู้ของฉัน
           </h2>
           <div className="mt-3 space-y-2">
-            {myDiscussions.map((d) => (
+            {myDiscussions.length === 0 && (
+              <p className="p-2.5 text-sm text-muted-foreground">
+                ยังไม่มีกระทู้ —{" "}
+                <Link
+                  href="/discussions/new"
+                  className="text-primary hover:underline"
+                >
+                  ตั้งกระทู้ถามได้เลย
+                </Link>
+              </p>
+            )}
+            {myDiscussions.slice(0, 5).map((d) => (
               <Link
                 key={d.id}
                 href={`/discussions/${d.id}`}
@@ -132,10 +170,11 @@ export default function DashboardPage() {
                   <p className="truncate text-sm font-medium">{d.title}</p>
                   <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <MessageCircle className="h-3 w-3" /> {d.replies} คำตอบ
+                      <MessageCircle className="h-3 w-3" />
+                      {d._count.replies ?? 0} คำตอบ
                     </span>
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {d.time}
+                      <Clock className="h-3 w-3" /> {timeAgo(d.created_at)}
                     </span>
                   </p>
                 </div>
@@ -169,7 +208,7 @@ export default function DashboardPage() {
             </Link>
           </Card>
 
-          {/* บทความล่าสุดในระบบ */}
+          {/* ล่าสุดในระบบ */}
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-2 font-bold">
@@ -184,19 +223,20 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="mt-3 space-y-2">
-              {articles.slice(0, 3).map((a) => (
+              {(articles.data?.items ?? []).slice(0, 3).map((a) => (
                 <Link
-                  key={a.slug}
+                  key={a.id}
                   href={`/articles/${a.slug}`}
                   className="block rounded-lg p-2.5 transition-colors hover:bg-muted"
                 >
                   <p className="text-sm font-medium leading-snug">{a.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {a.category} · {a.time}
+                    {a.category.category_name} ·{" "}
+                    {timeAgo(a.published_at ?? a.created_at)}
                   </p>
                 </Link>
               ))}
-              {discussions.slice(0, 2).map((d) => (
+              {(discussions.data?.items ?? []).slice(0, 2).map((d) => (
                 <Link
                   key={d.id}
                   href={`/discussions/${d.id}`}
@@ -204,10 +244,16 @@ export default function DashboardPage() {
                 >
                   <p className="text-sm font-medium leading-snug">{d.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    กระทู้ · {d.category} · {d.time}
+                    กระทู้ · {d.category.category_name} · {timeAgo(d.created_at)}
                   </p>
                 </Link>
               ))}
+              {articles.data?.items.length === 0 &&
+                discussions.data?.items.length === 0 && (
+                  <p className="p-2.5 text-sm text-muted-foreground">
+                    ยังไม่มีเนื้อหาในระบบ
+                  </p>
+                )}
             </div>
           </Card>
         </div>

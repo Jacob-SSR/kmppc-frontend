@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bookmark,
   BookmarkX,
@@ -11,42 +12,37 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { articles, bookmarks, discussions } from "@/lib/mock-data";
+import { useToast } from "@/components/ui/toast";
+import { api, getApiErrorMessage } from "@/lib/api";
+import { useBookmarks, type Bookmark as BookmarkItem } from "@/lib/queries";
+import { timeAgo } from "@/lib/format";
 
-// บุ๊คมาร์คของฉัน — จะเชื่อม GET /api/bookmarks + POST /api/bookmarks/toggle ในสปรินต์ถัดไป
 export default function BookmarksPage() {
-  const items = bookmarks
-    .map((b) => {
-      if (b.kind === "article") {
-        const a = articles.find((x) => x.slug === b.ref);
-        return a
-          ? {
-              id: b.id,
-              href: `/articles/${a.slug}`,
-              title: a.title,
-              sub: a.excerpt,
-              category: a.category,
-              kind: "บทความ",
-              icon: FileText,
-              saved_at: b.saved_at,
-            }
-          : null;
-      }
-      const d = discussions.find((x) => x.id === b.ref);
-      return d
-        ? {
-            id: b.id,
-            href: `/discussions/${d.id}`,
-            title: d.title,
-            sub: d.content,
-            category: d.category,
-            kind: "กระทู้",
-            icon: MessagesSquare,
-            saved_at: b.saved_at,
-          }
-        : null;
-    })
-    .filter((x) => x !== null);
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const bookmarks = useBookmarks();
+
+  const removeMutation = useMutation({
+    mutationFn: async (b: BookmarkItem) =>
+      api.post("/bookmarks/toggle", {
+        article_id: b.article?.id,
+        discussion_id: b.discussion?.id,
+      }),
+    onSuccess: () => {
+      toast.success("นำออกจากบุ๊คมาร์คแล้ว");
+      queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+    onError: (err) => toast.error("ลบบุ๊คมาร์คไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
+  const items = (bookmarks.data ?? []).map((b) => ({
+    raw: b,
+    href: b.article ? `/articles/${b.article.slug}` : `/discussions/${b.discussion?.id}`,
+    title: b.article?.title ?? b.discussion?.title ?? "",
+    sub: b.article?.excerpt ?? "",
+    kind: b.article ? "บทความ" : "กระทู้",
+    icon: b.article ? FileText : MessagesSquare,
+  }));
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
@@ -59,8 +55,12 @@ export default function BookmarksPage() {
       </p>
 
       <div className="mt-6 space-y-3">
+        {bookmarks.isLoading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="h-24 animate-pulse bg-muted/50" />
+          ))}
         {items.map((b) => (
-          <Card key={b.id} className="flex items-start gap-4 p-5">
+          <Card key={b.raw.id} className="flex items-start gap-4 p-5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
               <b.icon className="h-5 w-5 text-primary" />
             </span>
@@ -71,14 +71,15 @@ export default function BookmarksPage() {
                     {b.title}
                   </p>
                   <Badge variant="outline">{b.kind}</Badge>
-                  <Badge>{b.category}</Badge>
                 </div>
-                <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                  {b.sub}
-                </p>
+                {b.sub && (
+                  <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                    {b.sub}
+                  </p>
+                )}
               </Link>
               <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" /> บันทึกเมื่อ {b.saved_at}
+                <Clock className="h-3 w-3" /> บันทึกเมื่อ {timeAgo(b.raw.created_at)}
               </p>
             </div>
             <Button
@@ -86,14 +87,16 @@ export default function BookmarksPage() {
               size="icon"
               className="shrink-0 text-muted-foreground hover:text-destructive"
               aria-label="ลบบุ๊คมาร์ค"
+              onClick={() => removeMutation.mutate(b.raw)}
+              disabled={removeMutation.isPending}
             >
               <BookmarkX className="h-5 w-5" />
             </Button>
           </Card>
         ))}
-        {items.length === 0 && (
+        {!bookmarks.isLoading && items.length === 0 && (
           <Card className="p-10 text-center text-sm text-muted-foreground">
-            ยังไม่มีรายการที่บันทึกไว้
+            ยังไม่มีรายการที่บันทึกไว้ — กดปุ่มบุ๊คมาร์คในหน้าบทความหรือกระทู้เพื่อบันทึก
           </Card>
         )}
       </div>
