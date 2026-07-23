@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bookmark,
@@ -41,6 +41,16 @@ export default function ArticleDetailPage() {
     limit: 4,
   });
   const [comment, setComment] = useState("");
+  const commentBoxRef = useRef<HTMLTextAreaElement>(null);
+
+  // ตอบกลับแบบ mention — comment ของบทความเป็นเธรดชั้นเดียว
+  function replyToComment(name: string) {
+    setComment((prev) =>
+      prev.startsWith(`@${name} `) ? prev : `@${name} ${prev}`,
+    );
+    commentBoxRef.current?.focus();
+    commentBoxRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   function handleAuthError(err: unknown, action: string) {
     if (isUnauthorizedError(err)) {
@@ -210,43 +220,43 @@ export default function ArticleDetailPage() {
 
             <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-border pt-5">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => likeMutation.mutate()}
                 loading={likeMutation.isPending}
                 className={cn(
-                  a.liked_by_me &&
-                    "border-primary bg-secondary text-primary hover:bg-secondary",
+                  "text-muted-foreground",
+                  a.liked_by_me && "font-semibold text-primary hover:text-primary",
                 )}
               >
                 <ThumbsUp
-                  className={cn(
-                    "h-4 w-4 text-primary",
-                    a.liked_by_me && "fill-current",
-                  )}
+                  className={cn("h-4 w-4", a.liked_by_me && "fill-current")}
                 />
-                {a.liked_by_me ? "ถูกใจแล้ว" : "ถูกใจ"} ({a._count.likes})
+                ถูกใจ ({a._count.likes})
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => bookmarkMutation.mutate()}
                 loading={bookmarkMutation.isPending}
                 className={cn(
+                  "text-muted-foreground",
                   a.bookmarked_by_me &&
-                    "border-primary bg-secondary text-primary hover:bg-secondary",
+                    "font-semibold text-primary hover:text-primary",
                 )}
               >
                 <Bookmark
-                  className={cn(
-                    "h-4 w-4 text-primary",
-                    a.bookmarked_by_me && "fill-current",
-                  )}
+                  className={cn("h-4 w-4", a.bookmarked_by_me && "fill-current")}
                 />
-                {a.bookmarked_by_me ? "บุ๊คมาร์คแล้ว" : "บุ๊คมาร์ค"}
+                บุ๊คมาร์ค
               </Button>
-              <Button variant="outline" size="sm" onClick={share}>
-                <Share2 className="h-4 w-4 text-primary" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={share}
+              >
+                <Share2 className="h-4 w-4" />
                 แชร์
               </Button>
               <div className="ml-auto flex items-center gap-2">
@@ -289,6 +299,7 @@ export default function ArticleDetailPage() {
             <form className="mt-4 flex gap-3" onSubmit={submitComment}>
               <div className="flex-1">
                 <Textarea
+                  ref={commentBoxRef}
                   rows={3}
                   placeholder="แสดงความคิดเห็นของคุณ..."
                   value={comment}
@@ -325,12 +336,29 @@ export default function ArticleDetailPage() {
                       <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
                         {c.content}
                       </p>
-                      <button
-                        className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                        onClick={() => commentLikeMutation.mutate(c.id)}
-                      >
-                        <ThumbsUp className="h-3.5 w-3.5" /> ถูกใจ ({c._count.likes})
-                      </button>
+                      <div className="mt-2 flex items-center gap-4 text-xs">
+                        <button
+                          className={cn(
+                            "flex items-center gap-1 text-muted-foreground hover:text-primary",
+                            c.liked_by_me && "font-semibold text-primary",
+                          )}
+                          onClick={() => commentLikeMutation.mutate(c.id)}
+                        >
+                          <ThumbsUp
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              c.liked_by_me && "fill-current",
+                            )}
+                          />
+                          ถูกใจ ({c._count.likes})
+                        </button>
+                        <button
+                          className="text-muted-foreground hover:text-primary"
+                          onClick={() => replyToComment(name)}
+                        >
+                          ตอบกลับ
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

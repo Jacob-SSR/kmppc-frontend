@@ -69,6 +69,7 @@ export type ArticleComment = {
   created_at: string;
   user: Author;
   _count: { likes: number };
+  liked_by_me?: boolean;
 };
 
 export type Reply = {
@@ -76,6 +77,7 @@ export type Reply = {
   content: string;
   is_anonymous: boolean;
   is_best_answer: boolean;
+  parent_reply_id: string | null;
   created_at: string;
   author: Author;
   _count: { likes: number };

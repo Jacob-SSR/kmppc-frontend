@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
@@ -25,7 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
-import { useDiscussion, useMe } from "@/lib/queries";
+import { useDiscussion, useMe, type Reply } from "@/lib/queries";
 import { fullName, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,11 @@ export default function DiscussionDetailPage() {
   const me = useMe();
   const [reply, setReply] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  // ตอบกลับซ้อน — เก็บ id + ชื่อของคำตอบที่กำลังตอบกลับ
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const replyBoxRef = useRef<HTMLTextAreaElement>(null);
 
   function refetchThread() {
     queryClient.invalidateQueries({ queryKey: ["discussion", id] });
@@ -91,15 +96,23 @@ export default function DiscussionDetailPage() {
       api.post(`/discussions/${id}/replies`, {
         content: reply.trim(),
         is_anonymous: anonymous,
+        parent_reply_id: replyTo?.id,
       }),
     onSuccess: () => {
       setReply("");
       setAnonymous(false);
+      setReplyTo(null);
       toast.success("ส่งคำตอบแล้ว", "ขอบคุณที่ร่วมช่วยตอบ");
       refetchThread();
     },
     onError: (err) => handleAuthError(err, "ตอบกระทู้"),
   });
+
+  function startReplyTo(replyId: string, name: string) {
+    setReplyTo({ id: replyId, name });
+    replyBoxRef.current?.focus();
+    replyBoxRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   const deleteMutation = useMutation({
     mutationFn: async () => api.delete(`/discussions/${id}`),
@@ -179,6 +192,56 @@ export default function DiscussionDetailPage() {
     (me.data.role.role_name === "ADMIN" ||
       (!d.is_anonymous && d.author.id === me.data.id));
 
+  const topLevelReplies = replies.filter((r) => !r.parent_reply_id);
+  const childrenOf = (parentId: string) =>
+    replies.filter((r) => r.parent_reply_id === parentId);
+
+  function renderReplyItem(r: Reply) {
+    const name = fullName(r.author);
+    return (
+      <div className="flex gap-3">
+        {r.is_anonymous ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <VenetianMask className="h-4 w-4" />
+          </span>
+        ) : (
+          <Avatar name={name} size="sm" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">{name}</p>
+            <span className="text-xs text-muted-foreground">
+              {timeAgo(r.created_at)}
+            </span>
+          </div>
+          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">
+            {r.content}
+          </p>
+          <div className="mt-2.5 flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <ThumbsUp className="h-3.5 w-3.5" /> ถูกใจ ({r._count.likes})
+            </span>
+            <button
+              className="hover:text-primary"
+              onClick={() => startReplyTo(r.parent_reply_id ?? r.id, name)}
+            >
+              ตอบกลับ
+            </button>
+            {canPickBest && !r.is_best_answer && !r.parent_reply_id && (
+              <button
+                className="flex items-center gap-1 hover:text-emerald-700"
+                onClick={() => bestAnswerMutation.mutate(r.id)}
+              >
+                <Award className="h-3.5 w-3.5" />
+                เลือกเป็นคำตอบที่ดีที่สุด
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <PublicShell>
       <div className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
@@ -226,40 +289,35 @@ export default function DiscussionDetailPage() {
 
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-4">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => likeMutation.mutate()}
               loading={likeMutation.isPending}
               className={cn(
-                d.liked_by_me &&
-                  "border-primary bg-secondary text-primary hover:bg-secondary",
+                "text-muted-foreground",
+                d.liked_by_me && "font-semibold text-primary hover:text-primary",
               )}
             >
               <ThumbsUp
-                className={cn(
-                  "h-4 w-4 text-primary",
-                  d.liked_by_me && "fill-current",
-                )}
+                className={cn("h-4 w-4", d.liked_by_me && "fill-current")}
               />
-              {d.liked_by_me ? "ถูกใจแล้ว" : "ถูกใจ"} ({d._count.likes})
+              ถูกใจ ({d._count.likes})
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => bookmarkMutation.mutate()}
               loading={bookmarkMutation.isPending}
               className={cn(
+                "text-muted-foreground",
                 d.bookmarked_by_me &&
-                  "border-primary bg-secondary text-primary hover:bg-secondary",
+                  "font-semibold text-primary hover:text-primary",
               )}
             >
               <Bookmark
-                className={cn(
-                  "h-4 w-4 text-primary",
-                  d.bookmarked_by_me && "fill-current",
-                )}
+                className={cn("h-4 w-4", d.bookmarked_by_me && "fill-current")}
               />
-              {d.bookmarked_by_me ? "บุ๊คมาร์คแล้ว" : "บุ๊คมาร์ค"}
+              บุ๊คมาร์ค
             </Button>
             <div className="ml-auto flex items-center gap-2">
               {canDelete && (
@@ -302,8 +360,8 @@ export default function DiscussionDetailPage() {
               ยังไม่มีคำตอบ — เป็นคนแรกที่ช่วยตอบกระทู้นี้เลย
             </Card>
           )}
-          {replies.map((r) => {
-            const name = fullName(r.author);
+          {topLevelReplies.map((r) => {
+            const children = childrenOf(r.id);
             return (
               <Card
                 key={r.id}
@@ -317,40 +375,14 @@ export default function DiscussionDetailPage() {
                     <Award className="h-4 w-4" /> คำตอบที่ดีที่สุด
                   </p>
                 )}
-                <div className="flex gap-3">
-                  {r.is_anonymous ? (
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                      <VenetianMask className="h-4 w-4" />
-                    </span>
-                  ) : (
-                    <Avatar name={name} size="sm" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">{name}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {timeAgo(r.created_at)}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">
-                      {r.content}
-                    </p>
-                    <div className="mt-2.5 flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <ThumbsUp className="h-3.5 w-3.5" /> ถูกใจ ({r._count.likes})
-                      </span>
-                      {canPickBest && !r.is_best_answer && (
-                        <button
-                          className="flex items-center gap-1 hover:text-emerald-700"
-                          onClick={() => bestAnswerMutation.mutate(r.id)}
-                        >
-                          <Award className="h-3.5 w-3.5" />
-                          เลือกเป็นคำตอบที่ดีที่สุด
-                        </button>
-                      )}
-                    </div>
+                {renderReplyItem(r)}
+                {children.length > 0 && (
+                  <div className="ml-6 mt-3 space-y-3 border-l-2 border-border pl-4">
+                    {children.map((c) => (
+                      <div key={c.id}>{renderReplyItem(c)}</div>
+                    ))}
                   </div>
-                </div>
+                )}
               </Card>
             );
           })}
@@ -359,10 +391,30 @@ export default function DiscussionDetailPage() {
         {/* Reply form */}
         <Card className="mt-6 p-5">
           <h3 className="font-bold">ตอบกระทู้นี้</h3>
+          {replyTo && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-sm">
+              <span className="text-secondary-foreground">
+                กำลังตอบกลับคำตอบของ{" "}
+                <span className="font-semibold">{replyTo.name}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          )}
           <form className="mt-3" onSubmit={submitReply}>
             <Textarea
+              ref={replyBoxRef}
               rows={4}
-              placeholder="เขียนคำตอบของคุณ..."
+              placeholder={
+                replyTo
+                  ? `ตอบกลับคุณ${replyTo.name}...`
+                  : "เขียนคำตอบของคุณ..."
+              }
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               disabled={replyMutation.isPending}
