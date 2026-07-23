@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
                 id="email"
                 type="email"
                 name="email"
-                placeholder="เช่น somchai.c@srisuk-hospital.go.th"
+                placeholder="เช่น somchai.c@phlapphlachai-hospital.go.th"
                 className={`pl-9 ${fieldInvalidClass(error)}`}
                 autoComplete="email"
                 value={email}

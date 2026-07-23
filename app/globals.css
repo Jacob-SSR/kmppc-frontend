@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ธีมเขียวมิ้นท์ pastel — สีประจำโรงพยาบาลศรีสุข (ตาม SPEC schema shadcn) */
+/* ธีมเขียวมิ้นท์ pastel — สีประจำโรงพยาบาลพลับพลาชัย (ตาม SPEC schema shadcn) */
 :root {
   --background: hsl(160 30% 98%);
   --foreground: hsl(170 25% 15%);

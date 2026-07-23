@@ -32,7 +32,7 @@ export function Logo({
             light ? "text-white" : "text-primary-dark"
           )}
         >
-          โรงพยาบาลศรีสุข
+          โรงพยาบาลพลับพลาชัย
         </p>
         <p
           className={cn(

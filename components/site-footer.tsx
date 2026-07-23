@@ -16,12 +16,12 @@ export function SiteFooter() {
         <div className="flex items-center gap-3">
           <HospitalMark className="bg-white/15" />
           <div className="leading-tight">
-            <p className="font-bold">โรงพยาบาลศรีสุข</p>
+            <p className="font-bold">โรงพยาบาลพลับพลาชัย</p>
             <p className="text-xs text-white/70">
               ระบบจัดการองค์ความรู้ (Knowledge Management System)
             </p>
             <p className="text-xs text-white/70">
-              © 2024 โรงพยาบาลศรีสุข สงวนลิขสิทธิ์
+              © 2024 โรงพยาบาลพลับพลาชัย สงวนลิขสิทธิ์
             </p>
           </div>
         </div>

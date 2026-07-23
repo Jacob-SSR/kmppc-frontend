@@ -71,7 +71,7 @@ export default function Home() {
             <h1 className="text-3xl font-bold leading-tight text-primary-dark lg:text-5xl">
               ระบบจัดการองค์ความรู้
               <br />
-              โรงพยาบาลศรีสุข
+              โรงพยาบาลพลับพลาชัย
             </h1>
             <p className="mt-4 text-muted-foreground lg:text-lg">
               แหล่งรวมความรู้ คู่มือ และประสบการณ์ เพื่อพัฒนางานของเราให้ดียิ่งขึ้น

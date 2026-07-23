@@ -123,7 +123,7 @@ export const currentUser = {
   fname: "ณัฐวุฒิ",
   lname: "ใจดี",
   username: "nattawut.j",
-  email: "nattawut.j@srisuk-hospital.go.th",
+  email: "nattawut.j@phlapphlachai-hospital.go.th",
   employee_no: "EMP-1042",
   position: "IT Support",
   phone: "081-234-5678",

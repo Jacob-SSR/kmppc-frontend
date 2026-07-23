@@ -20,7 +20,7 @@ const channels = [
   {
     icon: Mail,
     title: "อีเมล",
-    lines: ["it-support@srisuk-hospital.go.th"],
+    lines: ["it-support@phlapphlachai-hospital.go.th"],
   },
   {
     icon: MapPin,

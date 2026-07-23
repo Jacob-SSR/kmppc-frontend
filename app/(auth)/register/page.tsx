@@ -202,7 +202,7 @@ export default function RegisterPage() {
               id="email"
               name="email"
               type="email"
-              placeholder="name@hospsrisuk.go.th"
+              placeholder="name@phlapphlachai-hospital.go.th"
               autoComplete="email"
               value={values.email}
               onChange={(e) => setValue("email", e.target.value)}

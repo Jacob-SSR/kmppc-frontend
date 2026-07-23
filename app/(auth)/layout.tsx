@@ -18,8 +18,8 @@ export default function AuthLayout({
       </main>
       <footer className="bg-primary-dark py-4 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 text-xs text-white/80 sm:flex-row lg:px-6">
-          <span>โรงพยาบาลศรีสุข — ระบบจัดการองค์ความรู้ (KM)</span>
-          <span>© 2024 โรงพยาบาลศรีสุข สงวนลิขสิทธิ์</span>
+          <span>โรงพยาบาลพลับพลาชัย — ระบบจัดการองค์ความรู้ (KM)</span>
+          <span>© 2024 โรงพยาบาลพลับพลาชัย สงวนลิขสิทธิ์</span>
         </div>
       </footer>
     </div>
