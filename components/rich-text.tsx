@@ -4,11 +4,11 @@ import { Fragment } from "react";
 import { cn } from "@/lib/utils";
 
 const URL_SPLIT_RE = /(https?:\/\/[^\s<>"]+)/g;
-// ลิงก์แบบฝังชื่อ: [ชื่อที่แสดง](https://...)
-const MD_LINK_SPLIT_RE = /(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g;
-const MD_LINK_RE = /^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/;
+// ลิงก์/รูปแบบฝังชื่อ: [ชื่อ](https://...) และ ![ชื่อ](https://...)
+const MD_LINK_SPLIT_RE = /(!?\[[^\]\n]*\]\(https?:\/\/[^\s)]+\))/g;
+const MD_LINK_RE = /^(!?)\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)$/;
 
-/** แสดงข้อความโดยแปลง [ชื่อ](url) และ URL เปล่าให้เป็นลิงก์ที่กดได้ (เปิดแท็บใหม่) */
+/** แสดงข้อความโดยแปลง ![รูป](url), [ชื่อ](url) และ URL เปล่าให้กดได้/แสดงรูป */
 export function RichText({
   text,
   className,
@@ -28,15 +28,26 @@ export function RichText({
       {text.split(MD_LINK_SPLIT_RE).map((chunk, i) => {
         const md = chunk.match(MD_LINK_RE);
         if (md) {
+          if (md[1] === "!") {
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={md[3]}
+                alt={md[2]}
+                className="my-2 max-h-96 w-auto max-w-full rounded-lg border border-border"
+              />
+            );
+          }
           return (
             <a
               key={i}
-              href={md[2]}
+              href={md[3]}
               target="_blank"
               rel="noopener noreferrer"
               className={linkClass}
             >
-              {md[1]}
+              {md[2]}
             </a>
           );
         }

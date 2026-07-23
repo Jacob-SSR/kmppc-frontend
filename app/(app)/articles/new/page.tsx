@@ -66,6 +66,47 @@ export default function NewArticlePage() {
     }
   }
 
+  // รูปประกอบโพสต์ — สูงสุด 10 รูป (ไม่นับปก) ฝังท้ายเนื้อหาเป็น ![ชื่อ](url)
+  const MAX_IMAGES = 10;
+  const [images, setImages] = useState<{ filename: string; url: string }[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const imagesInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImages(files: FileList | null) {
+    if (!files?.length) return;
+    setUploadingImages(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (images.length + 1 > MAX_IMAGES) break;
+        if (!file.type.startsWith("image/")) {
+          toast.error("ไม่ใช่ไฟล์รูปภาพ", file.name);
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error("รูปใหญ่เกิน 10MB", file.name);
+          continue;
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        const { data } = await api.post<{ url: string; filename?: string }>(
+          "/upload",
+          formData,
+        );
+        setImages((prev) =>
+          prev.length >= MAX_IMAGES
+            ? prev
+            : [...prev, { filename: data.filename ?? file.name, url: data.url }],
+        );
+      }
+      toast.success("เพิ่มรูปภาพแล้ว");
+    } catch (err) {
+      toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setUploadingImages(false);
+      if (imagesInputRef.current) imagesInputRef.current.value = "";
+    }
+  }
+
   // ไฟล์แนบ — อัปโหลดผ่าน POST /upload (ทุกนามสกุล ≤10MB) แล้วฝังลิงก์ท้ายเนื้อหา
   const [attachments, setAttachments] = useState<
     { filename: string; url: string }[]
@@ -107,12 +148,17 @@ export default function NewArticlePage() {
   }
 
   function contentWithAttachments(): string {
-    const body = content.trim();
-    if (attachments.length === 0) return body;
-    const lines = attachments
-      .map((a) => `[📎 ${a.filename}](${a.url})`)
-      .join("\n");
-    return `${body}\n\nไฟล์แนบ:\n${lines}`;
+    let body = content.trim();
+    if (images.length > 0) {
+      body += `\n\n${images.map((i) => `![${i.filename}](${i.url})`).join("\n")}`;
+    }
+    if (attachments.length > 0) {
+      const lines = attachments
+        .map((a) => `[📎 ${a.filename}](${a.url})`)
+        .join("\n");
+      body += `\n\nไฟล์แนบ:\n${lines}`;
+    }
+    return body;
   }
 
   function validate(): boolean {
@@ -313,6 +359,58 @@ export default function NewArticlePage() {
                   : "คลิกเพื่ออัปโหลดรูปภาพ (ไม่เกิน 10MB)"}
               </button>
             )}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              รูปประกอบ (สูงสุด {MAX_IMAGES} รูป ไม่นับรูปหน้าปก)
+            </label>
+            <input
+              ref={imagesInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleImages(e.target.files)}
+            />
+            <div className="flex flex-wrap gap-2">
+              {images.map((img) => (
+                <div
+                  key={img.url}
+                  className="relative h-24 w-24 overflow-hidden rounded-lg border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.url}
+                    alt={img.filename}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    aria-label="ลบรูป"
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-destructive"
+                    onClick={() =>
+                      setImages((prev) => prev.filter((x) => x.url !== img.url))
+                    }
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {images.length < MAX_IMAGES && (
+                <button
+                  type="button"
+                  onClick={() => imagesInputRef.current?.click()}
+                  disabled={uploadingImages || !!submitting}
+                  className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                  {uploadingImages
+                    ? "กำลังอัป..."
+                    : `เพิ่มรูป (${images.length}/${MAX_IMAGES})`}
+                </button>
+              )}
+            </div>
           </div>
 
           <div>
