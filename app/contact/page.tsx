@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Clock, Mail, MapPin, Phone, Send } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/toast";
+import { collectErrors, minLength, required, runRules } from "@/lib/validation";
 
 const channels = [
   {
@@ -30,7 +34,44 @@ const channels = [
   },
 ];
 
+type Errors = Partial<Record<"name" | "contact" | "message", string>>;
+
 export default function ContactPage() {
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [message, setMessage] = useState("");
+  const [errors, setErrors] = useState<Errors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  // ยังไม่มี endpoint รับข้อความติดต่อฝั่ง backend — validate และตอบรับฝั่ง client ไปก่อน
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const nextErrors = collectErrors({
+      name: runRules(name, required("กรุณากรอกชื่อ-นามสกุล")),
+      contact: runRules(contact, required("กรุณากรอกช่องทางติดต่อกลับ")),
+      message: runRules(
+        message,
+        required("กรุณากรอกข้อความ"),
+        minLength(10, "กรุณาอธิบายรายละเอียดอย่างน้อย 10 ตัวอักษร"),
+      ),
+    });
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setSubmitting(true);
+    setTimeout(() => {
+      setSubmitting(false);
+      setName("");
+      setContact("");
+      setMessage("");
+      toast.success(
+        "ส่งข้อความเรียบร้อย",
+        "ขอบคุณสำหรับข้อความ เจ้าหน้าที่จะติดต่อกลับโดยเร็วที่สุด",
+      );
+    }, 600);
+  }
+
   return (
     <PublicShell>
       <section className="border-b border-border bg-gradient-to-br from-secondary via-background to-accent/60">
@@ -61,28 +102,65 @@ export default function ContactPage() {
 
         <Card className="p-6">
           <h2 className="font-bold">ส่งข้อความถึงเรา</h2>
-          <form className="mt-4 space-y-4" onSubmit={(e) => e.preventDefault()}>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">
-                ชื่อ-นามสกุล
-              </label>
-              <Input placeholder="กรอกชื่อ-นามสกุล" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">
-                อีเมลหรือเบอร์ภายใน
-              </label>
-              <Input placeholder="สำหรับติดต่อกลับ" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">
-                ข้อความ
-              </label>
-              <Textarea rows={5} placeholder="รายละเอียดปัญหาหรือข้อเสนอแนะ..." />
-            </div>
-            <Button variant="dark" className="w-full" type="submit">
-              <Send className="h-4 w-4" />
-              ส่งข้อความ
+          <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate>
+            <FormField label="ชื่อ-นามสกุล" htmlFor="name" error={errors.name}>
+              <Input
+                id="name"
+                placeholder="กรอกชื่อ-นามสกุล"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (errors.name)
+                    setErrors((prev) => ({ ...prev, name: undefined }));
+                }}
+                aria-invalid={!!errors.name}
+                className={fieldInvalidClass(errors.name)}
+                disabled={submitting}
+              />
+            </FormField>
+            <FormField
+              label="อีเมลหรือเบอร์ภายใน"
+              htmlFor="contact"
+              error={errors.contact}
+            >
+              <Input
+                id="contact"
+                placeholder="สำหรับติดต่อกลับ"
+                value={contact}
+                onChange={(e) => {
+                  setContact(e.target.value);
+                  if (errors.contact)
+                    setErrors((prev) => ({ ...prev, contact: undefined }));
+                }}
+                aria-invalid={!!errors.contact}
+                className={fieldInvalidClass(errors.contact)}
+                disabled={submitting}
+              />
+            </FormField>
+            <FormField label="ข้อความ" htmlFor="message" error={errors.message}>
+              <Textarea
+                id="message"
+                rows={5}
+                placeholder="รายละเอียดปัญหาหรือข้อเสนอแนะ..."
+                value={message}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  if (errors.message)
+                    setErrors((prev) => ({ ...prev, message: undefined }));
+                }}
+                aria-invalid={!!errors.message}
+                className={fieldInvalidClass(errors.message)}
+                disabled={submitting}
+              />
+            </FormField>
+            <Button
+              variant="dark"
+              className="w-full"
+              type="submit"
+              loading={submitting}
+            >
+              {!submitting && <Send className="h-4 w-4" />}
+              {submitting ? "กำลังส่ง..." : "ส่งข้อความ"}
             </Button>
           </form>
         </Card>
