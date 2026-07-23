@@ -309,7 +309,7 @@ export default function DiscussionDetailPage() {
           </div>
 
           {isGuest ? (
-            <div className="relative mt-5 overflow-hidden">
+            <div className="relative mt-5 min-h-[260px] overflow-hidden">
               <div
                 className="pointer-events-none select-none blur-sm"
                 aria-hidden

@@ -234,7 +234,7 @@ export default function ArticleDetailPage() {
             </div>
 
             {isGuest ? (
-              <div className="relative mt-6 overflow-hidden">
+              <div className="relative mt-6 min-h-[260px] overflow-hidden">
                 <div
                   className="pointer-events-none select-none blur-sm"
                   aria-hidden

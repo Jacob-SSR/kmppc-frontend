@@ -46,10 +46,11 @@ export function collectErrors<K extends string>(
   return errors;
 }
 
-/** แปลง "a, b , c" → ["a","b","c"] สำหรับช่องแท็ก */
+/** แปลงช่องแท็กเป็นรายการ — แยกได้ทั้งจุลภาคและช่องว่าง ตัด # นำหน้า และตัดตัวซ้ำ */
 export function parseTags(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((t) => t.trim())
+  const tags = raw
+    .split(/[,\s]+/)
+    .map((t) => t.trim().replace(/^#+/, ""))
     .filter(Boolean);
+  return [...new Set(tags)];
 }
