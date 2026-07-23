@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   MessageCircle,
+  MessageCirclePlus,
   Paperclip,
   Search,
   Send,
@@ -17,9 +19,11 @@ import { api, getApiErrorMessage } from "@/lib/api";
 import {
   useChatMessages,
   useConversations,
+  useDirectory,
   useMe,
   type Conversation,
 } from "@/lib/queries";
+import { useDebounced } from "@/lib/use-debounce";
 import { fullName, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +45,30 @@ export default function ChatPage() {
   const [text, setText] = useState("");
   const messages = useChatMessages(activeId);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // โหมดเริ่มการสนทนาใหม่ — ค้นหาเพื่อนร่วมงานจาก /users/directory
+  const [newChatMode, setNewChatMode] = useState(false);
+  const [userQuery, setUserQuery] = useState("");
+  const debouncedUserQuery = useDebounced(userQuery);
+  const directory = useDirectory(debouncedUserQuery, newChatMode);
+
+  const startChatMutation = useMutation({
+    mutationFn: async (memberId: string) =>
+      (
+        await api.post<Conversation>("/chat/conversations", {
+          type: "DIRECT",
+          member_ids: [memberId],
+        })
+      ).data,
+    onSuccess: (conversation) => {
+      setNewChatMode(false);
+      setUserQuery("");
+      setSelectedId(conversation.id);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) =>
+      toast.error("เริ่มการสนทนาไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   const list = (conversations.data ?? []).filter(
     (c) =>
@@ -97,24 +125,92 @@ export default function ChatPage() {
       {/* รายชื่อการสนทนา */}
       <aside className="flex w-full max-w-xs shrink-0 flex-col border-r border-border bg-card">
         <div className="border-b border-border p-4">
-          <h1 className="font-bold">แชท</h1>
+          <div className="flex items-center justify-between">
+            {newChatMode ? (
+              <button
+                className="flex items-center gap-1.5 text-sm font-bold hover:text-primary"
+                onClick={() => setNewChatMode(false)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                เริ่มการสนทนาใหม่
+              </button>
+            ) : (
+              <h1 className="font-bold">แชท</h1>
+            )}
+            {!newChatMode && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="เริ่มการสนทนาใหม่"
+                onClick={() => setNewChatMode(true)}
+              >
+                <MessageCirclePlus className="h-5 w-5 text-primary" />
+              </Button>
+            )}
+          </div>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="ค้นหาการสนทนา..."
-              className="h-9 pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            {newChatMode ? (
+              <Input
+                placeholder="ค้นหาชื่อเพื่อนร่วมงาน..."
+                className="h-9 pl-9"
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <Input
+                placeholder="ค้นหาการสนทนา..."
+                className="h-9 pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            )}
           </div>
         </div>
+        {newChatMode ? (
+          <div className="flex-1 overflow-y-auto">
+            {directory.isLoading && (
+              <p className="p-4 text-sm text-muted-foreground">
+                กำลังค้นหา...
+              </p>
+            )}
+            {!directory.isLoading && (directory.data?.length ?? 0) === 0 && (
+              <p className="p-4 text-sm text-muted-foreground">
+                ไม่พบเพื่อนร่วมงานที่ค้นหา
+              </p>
+            )}
+            {directory.data?.map((u) => {
+              const name = fullName(u);
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => startChatMutation.mutate(u.id)}
+                  disabled={startChatMutation.isPending}
+                  className="flex w-full items-center gap-3 border-b border-border/60 p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                >
+                  <Avatar name={name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[u.position, u.department?.dept_name]
+                        .filter(Boolean)
+                        .join(" · ") || "เจ้าหน้าที่"}
+                    </p>
+                  </div>
+                  <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
         <div className="flex-1 overflow-y-auto">
           {conversations.isLoading && (
             <p className="p-4 text-sm text-muted-foreground">กำลังโหลด...</p>
           )}
           {!conversations.isLoading && list.length === 0 && (
             <p className="p-4 text-sm text-muted-foreground">
-              ยังไม่มีการสนทนา
+              ยังไม่มีการสนทนา — กดปุ่ม + มุมขวาบนเพื่อเริ่มคุยกับเพื่อนร่วมงาน
             </p>
           )}
           {list.map((c) => {
@@ -159,6 +255,7 @@ export default function ChatPage() {
             );
           })}
         </div>
+        )}
       </aside>
 
       {/* หน้าต่างสนทนา */}

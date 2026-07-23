@@ -339,6 +339,27 @@ export function useChatMessages(conversationId: string | null) {
   });
 }
 
+export type DirectoryUser = {
+  id: string;
+  fname: string;
+  lname: string | null;
+  position: string | null;
+  profile_image: string | null;
+  department: { dept_name: string } | null;
+};
+
+/** รายชื่อเพื่อนร่วมงานสำหรับเริ่มแชท (ต้อง login) */
+export function useDirectory(q: string, enabled = true) {
+  return useQuery({
+    queryKey: ["directory", q],
+    queryFn: async () =>
+      (await api.get<DirectoryUser[]>("/users/directory", { params: { q } }))
+        .data,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
 // ---------- Admin ----------
 
 export function useAdminUsers(params: { page?: number; limit?: number; q?: string } = {}) {
