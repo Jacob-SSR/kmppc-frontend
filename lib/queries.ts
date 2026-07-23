@@ -320,7 +320,8 @@ export function useConversations() {
     queryKey: ["conversations"],
     queryFn: async () =>
       (await api.get<Conversation[]>("/chat/conversations")).data,
-    refetchInterval: 15_000,
+    // realtime ผ่าน Socket.IO แล้ว — polling เป็นแค่ fallback
+    refetchInterval: 60_000,
   });
 }
 
@@ -335,7 +336,8 @@ export function useChatMessages(conversationId: string | null) {
         )
       ).data,
     enabled: !!conversationId,
-    refetchInterval: 10_000,
+    // realtime ผ่าน Socket.IO แล้ว — polling เป็นแค่ fallback
+    refetchInterval: 60_000,
   });
 }
 

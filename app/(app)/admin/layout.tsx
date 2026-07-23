@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Settings,
   ShieldCheck,
+  Tags,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const adminTabs = [
   { href: "/admin", label: "ภาพรวม", icon: LayoutDashboard },
   { href: "/admin/users", label: "ผู้ใช้งาน", icon: Users },
   { href: "/admin/categories", label: "หมวดหมู่", icon: LayoutGrid },
+  { href: "/admin/tags", label: "แท็ก", icon: Tags },
   { href: "/admin/knowledge", label: "คลังเอกสาร AI", icon: BookMarked },
   { href: "/admin/reports", label: "รายงานเนื้อหา", icon: Flag },
   { href: "/admin/settings", label: "ตั้งค่าระบบ", icon: Settings },

@@ -35,6 +35,37 @@ export default function NewArticlePage() {
     null,
   );
 
+  // รูปหน้าปก — อัปโหลดผ่าน POST /upload แล้วส่ง url ไปกับ cover_image
+  const [cover, setCover] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleCover(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("ไฟล์หน้าปกต้องเป็นรูปภาพ");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("รูปใหญ่เกิน 10MB");
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post<{ url: string }>("/upload", formData);
+      setCover(data.url);
+      toast.success("อัปโหลดรูปหน้าปกแล้ว");
+    } catch (err) {
+      toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  }
+
   // ไฟล์แนบ — อัปโหลดผ่าน POST /upload (ทุกนามสกุล ≤10MB) แล้วฝังลิงก์ท้ายเนื้อหา
   const [attachments, setAttachments] = useState<
     { filename: string; url: string }[]
@@ -105,6 +136,7 @@ export default function NewArticlePage() {
         title: title.trim(),
         content: contentWithAttachments(),
         category_id: categoryId,
+        cover_image: cover ?? undefined,
         excerpt: excerpt.trim() || undefined,
         tags: parseTags(tags),
         status,
@@ -232,19 +264,55 @@ export default function NewArticlePage() {
             <label className="mb-1.5 block text-sm font-medium">
               รูปภาพหน้าปก
             </label>
-            <button
-              type="button"
-              onClick={() =>
-                toast.info(
-                  "ยังอัปโหลดรูปไม่ได้",
-                  "ระบบอัปโหลดรูปภาพหน้าปกอยู่ระหว่างการพัฒนา",
-                )
-              }
-              className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-            >
-              <ImagePlus className="h-7 w-7" />
-              คลิกเพื่ออัปโหลดรูปภาพ (ไม่เกิน 10MB)
-            </button>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleCover(e.target.files)}
+            />
+            {cover ? (
+              <div className="relative overflow-hidden rounded-lg border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cover}
+                  alt="รูปหน้าปกบทความ"
+                  className="h-48 w-full object-cover"
+                />
+                <div className="absolute right-2 top-2 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => coverInputRef.current?.click()}
+                    loading={uploadingCover}
+                  >
+                    เปลี่ยนรูป
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => setCover(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={uploadingCover}
+                className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
+              >
+                <ImagePlus className="h-7 w-7" />
+                {uploadingCover
+                  ? "กำลังอัปโหลด..."
+                  : "คลิกเพื่ออัปโหลดรูปภาพ (ไม่เกิน 10MB)"}
+              </button>
+            )}
           </div>
 
           <div>

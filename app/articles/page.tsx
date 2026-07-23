@@ -124,7 +124,15 @@ function ArticlesContent() {
             <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {articles.data?.items.map((a) => (
                 <Link key={a.id} href={`/articles/${a.slug}`}>
-                  <Card className="flex h-full flex-col p-5 transition-shadow hover:shadow-md">
+                  <Card className="flex h-full flex-col overflow-hidden p-5 transition-shadow hover:shadow-md">
+                    {a.cover_image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={a.cover_image}
+                        alt=""
+                        className="-mx-5 -mt-5 mb-4 h-36 w-[calc(100%+2.5rem)] max-w-none object-cover"
+                      />
+                    )}
                     <div className="flex items-center gap-2">
                       <Badge>{a.category.category_name}</Badge>
                       {a.is_pinned && (

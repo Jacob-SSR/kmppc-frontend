@@ -234,6 +234,15 @@ export default function ArticleDetailPage() {
               </span>
             </div>
 
+            {a.cover_image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={a.cover_image}
+                alt={a.title}
+                className="mt-5 max-h-96 w-full rounded-xl object-cover"
+              />
+            )}
+
             {isGuest ? (
               <div className="relative mt-6 min-h-[260px] overflow-hidden">
                 <div

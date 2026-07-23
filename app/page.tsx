@@ -228,9 +228,18 @@ export default function Home() {
                   href={`/articles/${a.slug}`}
                   className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-muted"
                 >
-                  <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                    <Database className="h-6 w-6 text-primary" />
-                  </div>
+                  {a.cover_image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={a.cover_image}
+                      alt=""
+                      className="h-16 w-20 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                      <Database className="h-6 w-6 text-primary" />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-semibold">{a.title}</p>

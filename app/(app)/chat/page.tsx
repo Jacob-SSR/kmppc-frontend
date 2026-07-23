@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Check,
   MessageCircle,
   MessageCirclePlus,
   Paperclip,
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { RichText } from "@/components/rich-text";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { getChatSocket } from "@/lib/socket";
 import {
   useChatMessages,
   useConversations,
@@ -47,29 +49,103 @@ export default function ChatPage() {
   const messages = useChatMessages(activeId);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // โหมดเริ่มการสนทนาใหม่ — ค้นหาเพื่อนร่วมงานจาก /users/directory
+  // ---------- Socket.IO realtime ----------
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const socket = getChatSocket();
+    socket.connect();
+    const onNewMessage = (m: { conversation_id: string }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["chat-messages", m.conversation_id],
+      });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    };
+    const onOnline = (ids: string[]) => setOnlineIds(new Set(ids));
+    socket.on("message:new", onNewMessage);
+    socket.on("users:online", onOnline);
+    return () => {
+      socket.off("message:new", onNewMessage);
+      socket.off("users:online", onOnline);
+    };
+  }, [queryClient]);
+
+  // join ทุกห้องที่เป็นสมาชิก เพื่อรับข้อความ realtime แม้ไม่ได้เปิดห้องนั้นอยู่
+  const conversationKey = (conversations.data ?? []).map((c) => c.id).join(",");
+  useEffect(() => {
+    const socket = getChatSocket();
+    const join = () => {
+      conversationKey
+        .split(",")
+        .filter(Boolean)
+        .forEach((id) =>
+          socket.emit("conversation:join", { conversation_id: id }),
+        );
+    };
+    join();
+    socket.on("connect", join);
+    return () => {
+      socket.off("connect", join);
+    };
+  }, [conversationKey]);
+
+  // ---------- เริ่มการสนทนาใหม่ (ส่วนตัว/กลุ่ม) ----------
   const [newChatMode, setNewChatMode] = useState(false);
+  const [groupMode, setGroupMode] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [userQuery, setUserQuery] = useState("");
   const debouncedUserQuery = useDebounced(userQuery);
   const directory = useDirectory(debouncedUserQuery, newChatMode);
 
+  function resetNewChat() {
+    setNewChatMode(false);
+    setGroupMode(false);
+    setGroupName("");
+    setSelectedMembers([]);
+    setUserQuery("");
+  }
+
   const startChatMutation = useMutation({
-    mutationFn: async (memberId: string) =>
-      (
-        await api.post<Conversation>("/chat/conversations", {
-          type: "DIRECT",
-          member_ids: [memberId],
-        })
-      ).data,
+    mutationFn: async (payload: {
+      type: "DIRECT" | "GROUP";
+      name?: string;
+      member_ids: string[];
+    }) => (await api.post<Conversation>("/chat/conversations", payload)).data,
     onSuccess: (conversation) => {
-      setNewChatMode(false);
-      setUserQuery("");
+      resetNewChat();
       setSelectedId(conversation.id);
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (err) =>
       toast.error("เริ่มการสนทนาไม่สำเร็จ", getApiErrorMessage(err)),
   });
+
+  function toggleMember(id: string, name: string) {
+    setSelectedMembers((prev) =>
+      prev.some((m) => m.id === id)
+        ? prev.filter((m) => m.id !== id)
+        : [...prev, { id, name }],
+    );
+  }
+
+  function createGroup() {
+    if (selectedMembers.length < 2) {
+      toast.error("สมาชิกไม่พอ", "กลุ่มต้องมีสมาชิกอื่นอย่างน้อย 2 คน");
+      return;
+    }
+    if (!groupName.trim()) {
+      toast.error("กรุณาตั้งชื่อกลุ่ม");
+      return;
+    }
+    startChatMutation.mutate({
+      type: "GROUP",
+      name: groupName.trim(),
+      member_ids: selectedMembers.map((m) => m.id),
+    });
+  }
 
   const list = (conversations.data ?? []).filter(
     (c) =>
@@ -100,10 +176,28 @@ export default function ChatPage() {
   }, [activeId, latestId, queryClient]);
 
   const sendMutation = useMutation({
-    mutationFn: async () =>
-      api.post(`/chat/conversations/${activeId}/messages`, {
+    mutationFn: async () => {
+      const body = { conversation_id: activeId, message: text.trim() };
+      // ส่งผ่าน socket ก่อนเพื่อ broadcast ทันที — ถ้าไม่สำเร็จ fallback เป็น REST
+      const socket = getChatSocket();
+      if (socket.connected) {
+        const ok = await new Promise<boolean>((resolve) => {
+          socket
+            .timeout(4000)
+            .emit(
+              "message:send",
+              body,
+              (err: unknown, res?: { success?: boolean }) => {
+                resolve(!err && !!res?.success);
+              },
+            );
+        });
+        if (ok) return;
+      }
+      await api.post(`/chat/conversations/${activeId}/messages`, {
         message: text.trim(),
-      }),
+      });
+    },
     onSuccess: () => {
       setText("");
       queryClient.invalidateQueries({ queryKey: ["chat-messages", activeId] });
@@ -137,9 +231,24 @@ export default function ChatPage() {
         "/upload",
         formData,
       );
-      await api.post(`/chat/conversations/${activeId}/messages`, {
-        message: `📎 ${data.filename ?? file.name}\n${data.url}`,
-      });
+      const message = `📎 ${data.filename ?? file.name}\n${data.url}`;
+      const socket = getChatSocket();
+      let sent = false;
+      if (socket.connected) {
+        sent = await new Promise<boolean>((resolve) => {
+          socket
+            .timeout(4000)
+            .emit(
+              "message:send",
+              { conversation_id: activeId, message },
+              (err: unknown, res?: { success?: boolean }) =>
+                resolve(!err && !!res?.success),
+            );
+        });
+      }
+      if (!sent) {
+        await api.post(`/chat/conversations/${activeId}/messages`, { message });
+      }
       queryClient.invalidateQueries({ queryKey: ["chat-messages", activeId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {
@@ -153,6 +262,15 @@ export default function ChatPage() {
   // เรียงเก่า → ใหม่ (API ส่งใหม่ → เก่า)
   const thread = [...(messages.data?.items ?? [])].reverse();
 
+  function isOnline(userId: string | null | undefined): boolean {
+    return !!userId && onlineIds.has(userId);
+  }
+
+  function directOtherId(c: Conversation): string | null {
+    if (c.type === "GROUP") return null;
+    return c.members.find((m) => m.user.id !== me.data?.id)?.user.id ?? null;
+  }
+
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* รายชื่อการสนทนา */}
@@ -162,10 +280,10 @@ export default function ChatPage() {
             {newChatMode ? (
               <button
                 className="flex items-center gap-1.5 text-sm font-bold hover:text-primary"
-                onClick={() => setNewChatMode(false)}
+                onClick={resetNewChat}
               >
                 <ArrowLeft className="h-4 w-4" />
-                เริ่มการสนทนาใหม่
+                {groupMode ? "สร้างกลุ่มสนทนา" : "เริ่มการสนทนาใหม่"}
               </button>
             ) : (
               <h1 className="font-bold">แชท</h1>
@@ -181,6 +299,28 @@ export default function ChatPage() {
               </Button>
             )}
           </div>
+          {newChatMode && (
+            <div className="mt-2 flex gap-1 rounded-lg bg-muted p-1 text-sm">
+              <button
+                className={cn(
+                  "flex-1 rounded-md px-2 py-1.5 transition-colors",
+                  !groupMode && "bg-card font-semibold shadow-sm",
+                )}
+                onClick={() => setGroupMode(false)}
+              >
+                ส่วนตัว
+              </button>
+              <button
+                className={cn(
+                  "flex-1 rounded-md px-2 py-1.5 transition-colors",
+                  groupMode && "bg-card font-semibold shadow-sm",
+                )}
+                onClick={() => setGroupMode(true)}
+              >
+                กลุ่ม
+              </button>
+            </div>
+          )}
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             {newChatMode ? (
@@ -201,93 +341,156 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+
         {newChatMode ? (
+          <>
+            <div className="flex-1 overflow-y-auto">
+              {directory.isLoading && (
+                <p className="p-4 text-sm text-muted-foreground">
+                  กำลังค้นหา...
+                </p>
+              )}
+              {!directory.isLoading && (directory.data?.length ?? 0) === 0 && (
+                <p className="p-4 text-sm text-muted-foreground">
+                  ไม่พบเพื่อนร่วมงานที่ค้นหา
+                </p>
+              )}
+              {directory.data?.map((u) => {
+                const name = fullName(u);
+                const selected = selectedMembers.some((m) => m.id === u.id);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() =>
+                      groupMode
+                        ? toggleMember(u.id, name)
+                        : startChatMutation.mutate({
+                            type: "DIRECT",
+                            member_ids: [u.id],
+                          })
+                    }
+                    disabled={startChatMutation.isPending}
+                    className={cn(
+                      "flex w-full items-center gap-3 border-b border-border/60 p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-50",
+                      groupMode && selected && "bg-secondary",
+                    )}
+                  >
+                    <div className="relative">
+                      <Avatar name={name} />
+                      {isOnline(u.id) && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[u.position, u.department?.dept_name]
+                          .filter(Boolean)
+                          .join(" · ") || "เจ้าหน้าที่"}
+                      </p>
+                    </div>
+                    {groupMode ? (
+                      <span
+                        className={cn(
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                          selected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border",
+                        )}
+                      >
+                        {selected && <Check className="h-3.5 w-3.5" />}
+                      </span>
+                    ) : (
+                      <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {groupMode && (
+              <div className="border-t border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  เลือกแล้ว {selectedMembers.length} คน
+                  {selectedMembers.length > 0 &&
+                    ` — ${selectedMembers.map((m) => m.name).join(", ")}`}
+                </p>
+                <Input
+                  placeholder="ตั้งชื่อกลุ่ม..."
+                  className="mt-2 h-9"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                />
+                <Button
+                  className="mt-2 w-full"
+                  size="sm"
+                  variant="dark"
+                  onClick={createGroup}
+                  loading={startChatMutation.isPending}
+                >
+                  {!startChatMutation.isPending && <Users className="h-4 w-4" />}
+                  สร้างกลุ่ม
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
           <div className="flex-1 overflow-y-auto">
-            {directory.isLoading && (
+            {conversations.isLoading && (
+              <p className="p-4 text-sm text-muted-foreground">กำลังโหลด...</p>
+            )}
+            {!conversations.isLoading && list.length === 0 && (
               <p className="p-4 text-sm text-muted-foreground">
-                กำลังค้นหา...
+                ยังไม่มีการสนทนา — กดปุ่ม + มุมขวาบนเพื่อเริ่มคุยกับเพื่อนร่วมงาน
               </p>
             )}
-            {!directory.isLoading && (directory.data?.length ?? 0) === 0 && (
-              <p className="p-4 text-sm text-muted-foreground">
-                ไม่พบเพื่อนร่วมงานที่ค้นหา
-              </p>
-            )}
-            {directory.data?.map((u) => {
-              const name = fullName(u);
+            {list.map((c) => {
+              const name = conversationName(c, me.data?.id);
+              const otherId = directOtherId(c);
               return (
                 <button
-                  key={u.id}
-                  onClick={() => startChatMutation.mutate(u.id)}
-                  disabled={startChatMutation.isPending}
-                  className="flex w-full items-center gap-3 border-b border-border/60 p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                  key={c.id}
+                  onClick={() => setSelectedId(c.id)}
+                  className={cn(
+                    "flex w-full items-center gap-3 border-b border-border/60 p-3.5 text-left transition-colors hover:bg-muted",
+                    c.id === activeId && "bg-secondary",
+                  )}
                 >
-                  <Avatar name={name} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[u.position, u.department?.dept_name]
-                        .filter(Boolean)
-                        .join(" · ") || "เจ้าหน้าที่"}
-                    </p>
+                  <div className="relative">
+                    {c.type === "GROUP" ? (
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                        <Users className="h-5 w-5" />
+                      </span>
+                    ) : (
+                      <Avatar name={name} />
+                    )}
+                    {isOnline(otherId) && (
+                      <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
+                    )}
                   </div>
-                  <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">{name}</p>
+                      {c.last_message && (
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {timeAgo(c.last_message.created_at)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs text-muted-foreground">
+                        {c.last_message?.message ?? "ยังไม่มีข้อความ"}
+                      </p>
+                      {c.unread_count > 0 && (
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </button>
               );
             })}
           </div>
-        ) : (
-        <div className="flex-1 overflow-y-auto">
-          {conversations.isLoading && (
-            <p className="p-4 text-sm text-muted-foreground">กำลังโหลด...</p>
-          )}
-          {!conversations.isLoading && list.length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">
-              ยังไม่มีการสนทนา — กดปุ่ม + มุมขวาบนเพื่อเริ่มคุยกับเพื่อนร่วมงาน
-            </p>
-          )}
-          {list.map((c) => {
-            const name = conversationName(c, me.data?.id);
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedId(c.id)}
-                className={cn(
-                  "flex w-full items-center gap-3 border-b border-border/60 p-3.5 text-left transition-colors hover:bg-muted",
-                  c.id === activeId && "bg-secondary",
-                )}
-              >
-                {c.type === "GROUP" ? (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                    <Users className="h-5 w-5" />
-                  </span>
-                ) : (
-                  <Avatar name={name} />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-semibold">{name}</p>
-                    {c.last_message && (
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {timeAgo(c.last_message.created_at)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-xs text-muted-foreground">
-                      {c.last_message?.message ?? "ยังไม่มีข้อความ"}
-                    </p>
-                    {c.unread_count > 0 && (
-                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
-                        {c.unread_count}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
         )}
       </aside>
 
@@ -306,7 +509,12 @@ export default function ChatPage() {
                   <Users className="h-5 w-5" />
                 </span>
               ) : (
-                <Avatar name={conversationName(active, me.data?.id)} />
+                <div className="relative">
+                  <Avatar name={conversationName(active, me.data?.id)} />
+                  {isOnline(directOtherId(active)) && (
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
+                  )}
+                </div>
               )}
               <div>
                 <p className="font-semibold">
@@ -314,8 +522,12 @@ export default function ChatPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {active.type === "GROUP"
-                    ? `สมาชิก ${active.members.length} คน`
-                    : "การสนทนาส่วนตัว"}
+                    ? `สมาชิก ${active.members.length} คน — ${active.members
+                        .map((m) => m.user.fname)
+                        .join(", ")}`
+                    : isOnline(directOtherId(active))
+                      ? "ออนไลน์"
+                      : "ออฟไลน์"}
                 </p>
               </div>
             </header>
@@ -350,6 +562,11 @@ export default function ChatPage() {
                           : "rounded-bl-md border border-border bg-card",
                       )}
                     >
+                      {active.type === "GROUP" && !mine && (
+                        <p className="mb-0.5 text-xs font-semibold text-primary">
+                          {fullName(m.sender)}
+                        </p>
+                      )}
                       <RichText
                         text={m.message}
                         linkClassName={
