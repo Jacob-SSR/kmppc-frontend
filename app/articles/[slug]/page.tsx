@@ -67,7 +67,19 @@ export default function ArticleDetailPage() {
         .data,
     onSuccess: (data) => {
       toast.success(data.liked ? "ถูกใจบทความแล้ว" : "เลิกถูกใจบทความแล้ว");
-      queryClient.invalidateQueries({ queryKey: ["article", slug] });
+      // อัปเดต cache ตรง ๆ — ไม่ refetch เพื่อไม่ให้ view_count เพิ่มซ้ำ
+      queryClient.setQueryData<typeof article.data>(["article", slug], (old) =>
+        old
+          ? {
+              ...old,
+              liked_by_me: data.liked,
+              _count: {
+                ...old._count,
+                likes: old._count.likes + (data.liked ? 1 : -1),
+              },
+            }
+          : old,
+      );
     },
     onError: (err) => handleAuthError(err, "กดถูกใจ"),
   });
@@ -82,6 +94,9 @@ export default function ArticleDetailPage() {
     onSuccess: (data) => {
       toast.success(
         data.bookmarked ? "บันทึกบุ๊คมาร์คแล้ว" : "นำออกจากบุ๊คมาร์คแล้ว",
+      );
+      queryClient.setQueryData<typeof article.data>(["article", slug], (old) =>
+        old ? { ...old, bookmarked_by_me: data.bookmarked } : old,
       );
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
     },

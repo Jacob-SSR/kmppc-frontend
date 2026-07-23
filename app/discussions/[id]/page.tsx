@@ -62,7 +62,21 @@ export default function DiscussionDetailPage() {
       (await api.post<{ liked: boolean }>(`/discussions/${id}/like`)).data,
     onSuccess: (data) => {
       toast.success(data.liked ? "ถูกใจกระทู้แล้ว" : "เลิกถูกใจกระทู้แล้ว");
-      refetchThread();
+      // อัปเดต cache ตรง ๆ — ไม่ refetch เพื่อไม่ให้ view_count เพิ่มซ้ำ
+      queryClient.setQueryData<typeof discussion.data>(
+        ["discussion", id],
+        (old) =>
+          old
+            ? {
+                ...old,
+                liked_by_me: data.liked,
+                _count: {
+                  ...old._count,
+                  likes: old._count.likes + (data.liked ? 1 : -1),
+                },
+              }
+            : old,
+      );
     },
     onError: (err) => handleAuthError(err, "กดถูกใจ"),
   });
@@ -77,6 +91,10 @@ export default function DiscussionDetailPage() {
     onSuccess: (data) => {
       toast.success(
         data.bookmarked ? "บันทึกบุ๊คมาร์คแล้ว" : "นำออกจากบุ๊คมาร์คแล้ว",
+      );
+      queryClient.setQueryData<typeof discussion.data>(
+        ["discussion", id],
+        (old) => (old ? { ...old, bookmarked_by_me: data.bookmarked } : old),
       );
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
     },
