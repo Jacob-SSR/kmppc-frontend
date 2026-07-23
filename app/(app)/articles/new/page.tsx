@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, ImagePlus, Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,7 @@ type Errors = Partial<Record<"title" | "category_id" | "content", string>>;
 export default function NewArticlePage() {
   const router = useRouter();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const categories = useCategories();
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -63,6 +65,9 @@ export default function NewArticlePage() {
       } else {
         toast.success("บันทึกฉบับร่างแล้ว", "กลับมาแก้ไขต่อได้ทุกเมื่อ");
       }
+      // ล้าง cache รายการเพื่อให้บทความใหม่โผล่ทันทีโดยไม่ต้อง refresh
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       router.push("/articles");
     } catch (err) {
       if (isUnauthorizedError(err)) {

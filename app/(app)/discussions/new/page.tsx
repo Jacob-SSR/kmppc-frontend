@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquarePlus, Send, VenetianMask } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,7 @@ type Errors = Partial<Record<"title" | "category_id" | "content", string>>;
 export default function NewDiscussionPage() {
   const router = useRouter();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const categories = useCategories();
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -58,6 +60,9 @@ export default function NewDiscussionPage() {
           ? "โพสต์แบบไม่ระบุตัวตนแล้ว ชื่อของคุณจะไม่แสดงต่อผู้อื่น"
           : "รอเพื่อนร่วมงานเข้ามาช่วยตอบได้เลย",
       );
+      // ล้าง cache รายการเพื่อให้กระทู้ใหม่โผล่ทันทีโดยไม่ต้อง refresh
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       router.push("/discussions");
     } catch (err) {
       if (isUnauthorizedError(err)) {
