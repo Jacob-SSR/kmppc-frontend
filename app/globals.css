@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* ธีมเขียวมิ้นท์ pastel — สีประจำโรงพยาบาลศรีสุข (ตาม SPEC schema shadcn) */
+:root {
+  --background: hsl(160 30% 98%);
+  --foreground: hsl(170 25% 15%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(170 25% 15%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(170 25% 15%);
+  --primary: hsl(165 55% 40%);
+  --primary-foreground: hsl(160 40% 98%);
+  --secondary: hsl(160 45% 92%);
+  --secondary-foreground: hsl(170 30% 20%);
+  --muted: hsl(160 25% 94%);
+  --muted-foreground: hsl(170 12% 42%);
+  --accent: hsl(155 50% 88%);
+  --accent-foreground: hsl(170 30% 20%);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(160 20% 88%);
+  --input: hsl(160 20% 88%);
+  --ring: hsl(165 55% 40%);
+  --radius: 0.75rem;
+  --primary-dark: hsl(170 45% 24%);
+  --ai: hsl(243 75% 59%);
+  --ai-foreground: hsl(0 0% 100%);
+}
+
+.dark {
+  --background: hsl(175 25% 9%);
+  --foreground: hsl(160 20% 92%);
+  --card: hsl(175 22% 12%);
+  --card-foreground: hsl(160 20% 92%);
+  --popover: hsl(175 22% 12%);
+  --popover-foreground: hsl(160 20% 92%);
+  --primary: hsl(160 50% 65%);
+  --primary-foreground: hsl(175 30% 10%);
+  --secondary: hsl(172 18% 18%);
+  --secondary-foreground: hsl(160 20% 92%);
+  --muted: hsl(172 18% 18%);
+  --muted-foreground: hsl(160 12% 62%);
+  --accent: hsl(168 25% 22%);
+  --accent-foreground: hsl(160 20% 92%);
+  --destructive: hsl(0 62% 45%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(172 18% 20%);
+  --input: hsl(172 18% 20%);
+  --ring: hsl(160 50% 65%);
+  --primary-dark: hsl(170 35% 80%);
+  --ai: hsl(243 70% 70%);
+  --ai-foreground: hsl(243 40% 12%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ai: var(--ai);
+  --color-ai-foreground: var(--ai-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-ibm-plex-thai), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
