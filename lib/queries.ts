@@ -58,6 +58,9 @@ export type Article = {
   category: { id: string; category_name: string };
   tags?: { tag: { id: string; tag_name: string } }[];
   _count: { comments: number; likes: number };
+  // มีเฉพาะหน้า detail เมื่อผู้ใช้ login อยู่
+  liked_by_me?: boolean;
+  bookmarked_by_me?: boolean;
 };
 
 export type ArticleComment = {
@@ -91,6 +94,9 @@ export type Discussion = {
   tags?: { tag: { id: string; tag_name: string } }[];
   _count: { replies?: number; likes: number };
   replies?: Reply[];
+  // มีเฉพาะหน้า detail เมื่อผู้ใช้ login อยู่
+  liked_by_me?: boolean;
+  bookmarked_by_me?: boolean;
 };
 
 export type Me = {

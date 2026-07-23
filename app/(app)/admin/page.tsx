@@ -73,7 +73,7 @@ export default function AdminOverviewPage() {
       value: categories.data?.length,
       sub: "หมวดหมู่บทความและกระทู้",
       icon: LayoutGrid,
-      href: "/articles",
+      href: "/admin/categories",
     },
   ];
 

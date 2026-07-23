@@ -6,6 +6,7 @@ import {
   BookMarked,
   Flag,
   LayoutDashboard,
+  LayoutGrid,
   Settings,
   ShieldCheck,
   Users,
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 const adminTabs = [
   { href: "/admin", label: "ภาพรวม", icon: LayoutDashboard },
   { href: "/admin/users", label: "ผู้ใช้งาน", icon: Users },
+  { href: "/admin/categories", label: "หมวดหมู่", icon: LayoutGrid },
   { href: "/admin/knowledge", label: "คลังเอกสาร AI", icon: BookMarked },
   { href: "/admin/reports", label: "รายงานเนื้อหา", icon: Flag },
   { href: "/admin/settings", label: "ตั้งค่าระบบ", icon: Settings },

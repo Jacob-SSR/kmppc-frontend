@@ -13,6 +13,7 @@ import {
   Send,
   Share2,
   ThumbsUp,
+  Trash2,
   User,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
@@ -23,8 +24,9 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
-import { useArticle, useArticles, useComments } from "@/lib/queries";
+import { useArticle, useArticles, useComments, useMe } from "@/lib/queries";
 import { fullName, timeAgo } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export default function ArticleDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -32,6 +34,7 @@ export default function ArticleDetailPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const article = useArticle(slug);
+  const me = useMe();
   const comments = useComments(article.data?.id);
   const related = useArticles({
     category_id: article.data?.category.id,
@@ -95,6 +98,16 @@ export default function ArticleDetailPage() {
     onError: (err) => handleAuthError(err, "แสดงความคิดเห็น"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => api.delete(`/articles/${article.data!.id}`),
+    onSuccess: () => {
+      toast.success("ลบบทความแล้ว");
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      router.push("/articles");
+    },
+    onError: (err) => handleAuthError(err, "ลบบทความ"),
+  });
+
   const commentLikeMutation = useMutation({
     mutationFn: async (commentId: string) =>
       api.post(`/articles/${article.data!.id}/comments/${commentId}/like`),
@@ -154,6 +167,9 @@ export default function ArticleDetailPage() {
 
   const a = article.data;
   const tags = a.tags?.map((t) => t.tag) ?? [];
+  const canDelete =
+    !!me.data &&
+    (me.data.role.role_name === "ADMIN" || a.author.id === me.data.id);
   const relatedItems = (related.data?.items ?? [])
     .filter((r) => r.id !== a.id)
     .slice(0, 3);
@@ -198,33 +214,68 @@ export default function ArticleDetailPage() {
                 size="sm"
                 onClick={() => likeMutation.mutate()}
                 loading={likeMutation.isPending}
+                className={cn(
+                  a.liked_by_me &&
+                    "border-primary bg-secondary text-primary hover:bg-secondary",
+                )}
               >
-                <ThumbsUp className="h-4 w-4 text-primary" />
-                ถูกใจ ({a._count.likes})
+                <ThumbsUp
+                  className={cn(
+                    "h-4 w-4 text-primary",
+                    a.liked_by_me && "fill-current",
+                  )}
+                />
+                {a.liked_by_me ? "ถูกใจแล้ว" : "ถูกใจ"} ({a._count.likes})
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => bookmarkMutation.mutate()}
                 loading={bookmarkMutation.isPending}
+                className={cn(
+                  a.bookmarked_by_me &&
+                    "border-primary bg-secondary text-primary hover:bg-secondary",
+                )}
               >
-                <Bookmark className="h-4 w-4 text-primary" />
-                บุ๊คมาร์ค
+                <Bookmark
+                  className={cn(
+                    "h-4 w-4 text-primary",
+                    a.bookmarked_by_me && "fill-current",
+                  )}
+                />
+                {a.bookmarked_by_me ? "บุ๊คมาร์คแล้ว" : "บุ๊คมาร์ค"}
               </Button>
               <Button variant="outline" size="sm" onClick={share}>
                 <Share2 className="h-4 w-4 text-primary" />
                 แชร์
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-muted-foreground"
-                onClick={report}
-                loading={reportMutation.isPending}
-              >
-                <Flag className="h-4 w-4" />
-                รายงาน
-              </Button>
+              <div className="ml-auto flex items-center gap-2">
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/5"
+                    onClick={() => {
+                      if (window.confirm("ยืนยันลบบทความนี้?"))
+                        deleteMutation.mutate();
+                    }}
+                    loading={deleteMutation.isPending}
+                  >
+                    {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
+                    ลบบทความ
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={report}
+                  loading={reportMutation.isPending}
+                >
+                  <Flag className="h-4 w-4" />
+                  รายงาน
+                </Button>
+              </div>
             </div>
           </Card>
 

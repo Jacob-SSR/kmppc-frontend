@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   FileText,
+  LayoutDashboard,
   MessagesSquare,
   Sparkles,
   Info,
@@ -14,6 +15,8 @@ import {
 import { useState } from "react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { useMe } from "@/lib/queries";
+import { initial } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -27,6 +30,7 @@ const navItems = [
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const me = useMe();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
@@ -56,12 +60,23 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/login" className="hidden sm:block">
-            <Button variant="dark">
-              <Lock className="h-4 w-4" />
-              เข้าสู่ระบบ
-            </Button>
-          </Link>
+          {me.data ? (
+            <Link href="/dashboard" className="hidden sm:block">
+              <Button variant="outline">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+                  {initial(me.data.fname)}
+                </span>
+                คุณ{me.data.fname}
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/login" className="hidden sm:block">
+              <Button variant="dark">
+                <Lock className="h-4 w-4" />
+                เข้าสู่ระบบ
+              </Button>
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -87,14 +102,25 @@ export function SiteHeader() {
               {label}
             </Link>
           ))}
-          <Link
-            href="/login"
-            onClick={() => setOpen(false)}
-            className="mt-1 flex items-center gap-3 rounded-lg bg-primary-dark px-3 py-3 text-sm font-medium text-white"
-          >
-            <Lock className="h-4 w-4" />
-            เข้าสู่ระบบ
-          </Link>
+          {me.data ? (
+            <Link
+              href="/dashboard"
+              onClick={() => setOpen(false)}
+              className="mt-1 flex items-center gap-3 rounded-lg bg-primary-dark px-3 py-3 text-sm font-medium text-white"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              แดชบอร์ดของคุณ{me.data.fname}
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="mt-1 flex items-center gap-3 rounded-lg bg-primary-dark px-3 py-3 text-sm font-medium text-white"
+            >
+              <Lock className="h-4 w-4" />
+              เข้าสู่ระบบ
+            </Link>
+          )}
         </nav>
       )}
     </header>

@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Send,
   ThumbsUp,
+  Trash2,
   VenetianMask,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
@@ -100,6 +101,16 @@ export default function DiscussionDetailPage() {
     onError: (err) => handleAuthError(err, "ตอบกระทู้"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => api.delete(`/discussions/${id}`),
+    onSuccess: () => {
+      toast.success("ลบกระทู้แล้ว");
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+      router.push("/discussions");
+    },
+    onError: (err) => handleAuthError(err, "ลบกระทู้"),
+  });
+
   const bestAnswerMutation = useMutation({
     mutationFn: async (replyId: string) =>
       api.post(`/discussions/${id}/replies/${replyId}/best-answer`),
@@ -163,6 +174,10 @@ export default function DiscussionDetailPage() {
     !d.is_solved &&
     (me.data.role.role_name === "ADMIN" ||
       (!d.is_anonymous && d.author.id === me.data.id));
+  const canDelete =
+    !!me.data &&
+    (me.data.role.role_name === "ADMIN" ||
+      (!d.is_anonymous && d.author.id === me.data.id));
 
   return (
     <PublicShell>
@@ -215,29 +230,64 @@ export default function DiscussionDetailPage() {
               size="sm"
               onClick={() => likeMutation.mutate()}
               loading={likeMutation.isPending}
+              className={cn(
+                d.liked_by_me &&
+                  "border-primary bg-secondary text-primary hover:bg-secondary",
+              )}
             >
-              <ThumbsUp className="h-4 w-4 text-primary" />
-              ถูกใจ ({d._count.likes})
+              <ThumbsUp
+                className={cn(
+                  "h-4 w-4 text-primary",
+                  d.liked_by_me && "fill-current",
+                )}
+              />
+              {d.liked_by_me ? "ถูกใจแล้ว" : "ถูกใจ"} ({d._count.likes})
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => bookmarkMutation.mutate()}
               loading={bookmarkMutation.isPending}
+              className={cn(
+                d.bookmarked_by_me &&
+                  "border-primary bg-secondary text-primary hover:bg-secondary",
+              )}
             >
-              <Bookmark className="h-4 w-4 text-primary" />
-              บุ๊คมาร์ค
+              <Bookmark
+                className={cn(
+                  "h-4 w-4 text-primary",
+                  d.bookmarked_by_me && "fill-current",
+                )}
+              />
+              {d.bookmarked_by_me ? "บุ๊คมาร์คแล้ว" : "บุ๊คมาร์ค"}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto text-muted-foreground"
-              onClick={report}
-              loading={reportMutation.isPending}
-            >
-              <Flag className="h-4 w-4" />
-              รายงาน
-            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/5"
+                  onClick={() => {
+                    if (window.confirm("ยืนยันลบกระทู้นี้?"))
+                      deleteMutation.mutate();
+                  }}
+                  loading={deleteMutation.isPending}
+                >
+                  {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
+                  ลบกระทู้
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={report}
+                loading={reportMutation.isPending}
+              >
+                <Flag className="h-4 w-4" />
+                รายงาน
+              </Button>
+            </div>
           </div>
         </Card>
 
