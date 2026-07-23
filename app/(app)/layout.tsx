@@ -10,10 +10,12 @@ import {
   Home,
   MessageCircle,
   MessagesSquare,
+  ShieldCheck,
   Sparkles,
   User,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { currentUser } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const sidebarItems = [
@@ -25,6 +27,7 @@ const sidebarItems = [
   { href: "/bookmarks", label: "บุ๊คมาร์ค", icon: Bookmark },
   { href: "/notifications", label: "แจ้งเตือน", icon: Bell },
   { href: "/profile", label: "โปรไฟล์", icon: User },
+  { href: "/admin", label: "แอดมิน", icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function AppLayout({
@@ -51,12 +54,14 @@ export default function AppLayout({
             </button>
             <button className="flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
-                ฐ
+                {currentUser.fname.charAt(0)}
               </span>
               <span className="hidden text-left leading-tight sm:block">
-                <span className="block text-sm font-semibold">คุณณัฐวุฒิ</span>
+                <span className="block text-sm font-semibold">
+                  คุณ{currentUser.fname}
+                </span>
                 <span className="block text-xs text-muted-foreground">
-                  IT Support
+                  {currentUser.position}
                 </span>
               </span>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -68,7 +73,9 @@ export default function AppLayout({
       <div className="flex flex-1">
         <aside className="hidden w-24 shrink-0 border-r border-border bg-card py-4 md:block">
           <nav className="flex flex-col items-stretch gap-1 px-2">
-            {sidebarItems.map(({ href, label, icon: Icon }) => {
+            {sidebarItems
+              .filter((it) => !it.adminOnly || currentUser.role === "ADMIN")
+              .map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
                 <Link

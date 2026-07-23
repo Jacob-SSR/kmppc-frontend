@@ -1,0 +1,92 @@
+"use client";
+
+import { Clock, Mail, MapPin, Phone, Send } from "lucide-react";
+import { PublicShell } from "@/components/public-shell";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+const channels = [
+  {
+    icon: Phone,
+    title: "โทรศัพท์ภายใน",
+    lines: ["แผนก IT: ต่อ 1234", "แจ้งปัญหาเร่งด่วน: ต่อ 1235"],
+  },
+  {
+    icon: Mail,
+    title: "อีเมล",
+    lines: ["it-support@srisuk-hospital.go.th"],
+  },
+  {
+    icon: MapPin,
+    title: "ที่ตั้งแผนก",
+    lines: ["อาคารอำนวยการ ชั้น 2", "ห้องเทคโนโลยีสารสนเทศ"],
+  },
+  {
+    icon: Clock,
+    title: "เวลาทำการ",
+    lines: ["จันทร์ - ศุกร์ 08:30 - 16:30 น.", "นอกเวลา: โทรเวรฉุกเฉิน IT"],
+  },
+];
+
+export default function ContactPage() {
+  return (
+    <PublicShell>
+      <section className="border-b border-border bg-gradient-to-br from-secondary via-background to-accent/60">
+        <div className="mx-auto max-w-5xl px-4 py-12 lg:px-6">
+          <h1 className="text-3xl font-bold text-primary-dark">ติดต่อเรา</h1>
+          <p className="mt-2 text-muted-foreground">
+            พบปัญหาการใช้งานระบบ หรือมีข้อเสนอแนะ ติดต่อแผนกเทคโนโลยีสารสนเทศได้ทุกช่องทาง
+          </p>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-5xl gap-6 px-4 py-10 lg:grid-cols-2 lg:px-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {channels.map((c) => (
+            <Card key={c.title} className="p-5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                <c.icon className="h-5 w-5 text-primary" />
+              </span>
+              <h2 className="mt-3 font-bold">{c.title}</h2>
+              {c.lines.map((l) => (
+                <p key={l} className="mt-1 text-sm text-muted-foreground">
+                  {l}
+                </p>
+              ))}
+            </Card>
+          ))}
+        </div>
+
+        <Card className="p-6">
+          <h2 className="font-bold">ส่งข้อความถึงเรา</h2>
+          <form className="mt-4 space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                ชื่อ-นามสกุล
+              </label>
+              <Input placeholder="กรอกชื่อ-นามสกุล" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                อีเมลหรือเบอร์ภายใน
+              </label>
+              <Input placeholder="สำหรับติดต่อกลับ" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">
+                ข้อความ
+              </label>
+              <Textarea rows={5} placeholder="รายละเอียดปัญหาหรือข้อเสนอแนะ..." />
+            </div>
+            <Button variant="dark" className="w-full" type="submit">
+              <Send className="h-4 w-4" />
+              ส่งข้อความ
+            </Button>
+          </form>
+        </Card>
+      </section>
+    </PublicShell>
+  );
+}
