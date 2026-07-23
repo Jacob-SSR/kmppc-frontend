@@ -10,6 +10,7 @@ import {
   Eye,
   Flag,
   MessageCircle,
+  Lock,
   Send,
   Share2,
   ThumbsUp,
@@ -195,6 +196,8 @@ export default function ArticleDetailPage() {
   const canDelete =
     !!me.data &&
     (me.data.role.role_name === "ADMIN" || a.author.id === me.data.id);
+  // ยังไม่ login — เห็นแค่หัวข้อ ปิดชื่อผู้เขียน เนื้อหา/ความคิดเห็นถูกเบลอ
+  const isGuest = me.isError;
   const relatedItems = (related.data?.items ?? [])
     .filter((r) => r.id !== a.id)
     .slice(0, 3);
@@ -219,7 +222,8 @@ export default function ArticleDetailPage() {
 
             <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-border pb-5 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <User className="h-4 w-4" /> {fullName(a.author)}
+                <User className="h-4 w-4" />
+                {isGuest ? "สมาชิกในระบบ" : fullName(a.author)}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" /> {timeAgo(a.published_at ?? a.created_at)}
@@ -229,10 +233,39 @@ export default function ArticleDetailPage() {
               </span>
             </div>
 
-            <div className="mt-6 space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap">
-              {a.content}
-            </div>
+            {isGuest ? (
+              <div className="relative mt-6 overflow-hidden">
+                <div
+                  className="pointer-events-none select-none blur-sm"
+                  aria-hidden
+                >
+                  <div className="space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                    {a.content.slice(0, 600)}
+                  </div>
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 bg-gradient-to-b from-transparent via-background/70 to-background pb-4">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary">
+                    <Lock className="h-5 w-5 text-primary" />
+                  </span>
+                  <p className="text-center text-sm text-muted-foreground">
+                    เข้าสู่ระบบเพื่ออ่านบทความฉบับเต็มและความคิดเห็น (
+                    {a._count.comments} ความคิดเห็น)
+                  </p>
+                  <Link href="/login">
+                    <Button variant="dark">
+                      <Lock className="h-4 w-4" />
+                      เข้าสู่ระบบเพื่ออ่านต่อ
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                {a.content}
+              </div>
+            )}
 
+            {!isGuest && (
             <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-border pt-5">
               <Button
                 variant="ghost"
@@ -302,9 +335,11 @@ export default function ArticleDetailPage() {
                 </Button>
               </div>
             </div>
+            )}
           </Card>
 
           {/* Comments */}
+          {!isGuest && (
           <Card className="mt-6 p-6">
             <h2 className="flex items-center gap-2 font-bold">
               <MessageCircle className="h-5 w-5 text-primary" />
@@ -380,6 +415,7 @@ export default function ArticleDetailPage() {
               })}
             </div>
           </Card>
+          )}
         </div>
 
         {/* Sidebar */}

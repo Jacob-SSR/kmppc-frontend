@@ -199,7 +199,10 @@ export default function DiscussionDetailPage() {
   const d = discussion.data;
   const tags = d.tags?.map((t) => t.tag) ?? [];
   const replies = d.replies ?? [];
-  const authorName = fullName(d.author);
+  const realAuthorName = fullName(d.author);
+  // guest ไม่เห็นชื่อผู้ตั้งกระทู้ (โพสต์ anonymous แสดง "ไม่ระบุตัวตน" ตามเดิม)
+  const authorName =
+    me.isError && !d.is_anonymous ? "สมาชิกในระบบ" : realAuthorName;
   // เจ้าของกระทู้ (ที่ไม่ anonymous) หรือ ADMIN เท่านั้นที่เลือก best answer ได้
   const canPickBest =
     !!me.data &&
