@@ -18,6 +18,7 @@ import {
   User,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
+import { RichText } from "@/components/rich-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -261,7 +262,7 @@ export default function ArticleDetailPage() {
               </div>
             ) : (
               <div className="mt-6 space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap">
-                {a.content}
+                <RichText text={a.content} />
               </div>
             )}
 
@@ -384,7 +385,7 @@ export default function ArticleDetailPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
-                        {c.content}
+                        <RichText text={c.content} />
                       </p>
                       <div className="mt-2 flex items-center gap-4 text-xs">
                         <button

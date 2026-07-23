@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, ImagePlus, Save, Send } from "lucide-react";
+import { FilePlus2, ImagePlus, Paperclip, Save, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
@@ -35,6 +35,55 @@ export default function NewArticlePage() {
     null,
   );
 
+  // ไฟล์แนบ — อัปโหลดผ่าน POST /upload (ทุกนามสกุล ≤10MB) แล้วฝังลิงก์ท้ายเนื้อหา
+  const [attachments, setAttachments] = useState<
+    { filename: string; url: string }[]
+  >([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error("ไฟล์ใหญ่เกิน 10MB", file.name);
+          continue;
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        const { data } = await api.post<{ url: string; filename?: string }>(
+          "/upload",
+          formData,
+        );
+        setAttachments((prev) => [
+          ...prev,
+          { filename: data.filename ?? file.name, url: data.url },
+        ]);
+      }
+      toast.success("แนบไฟล์แล้ว");
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        toast.error("กรุณาเข้าสู่ระบบ", "ต้องเข้าสู่ระบบก่อนจึงจะแนบไฟล์ได้");
+      } else {
+        toast.error("อัปโหลดไฟล์ไม่สำเร็จ", getApiErrorMessage(err));
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function contentWithAttachments(): string {
+    const body = content.trim();
+    if (attachments.length === 0) return body;
+    const lines = attachments
+      .map((a) => `📎 ${a.filename}: ${a.url}`)
+      .join("\n");
+    return `${body}\n\nไฟล์แนบ:\n${lines}`;
+  }
+
   function validate(): boolean {
     const nextErrors = collectErrors({
       title: runRules(title, required("กรุณากรอกหัวข้อบทความ")),
@@ -54,7 +103,7 @@ export default function NewArticlePage() {
     try {
       await api.post("/articles", {
         title: title.trim(),
-        content: content.trim(),
+        content: contentWithAttachments(),
         category_id: categoryId,
         excerpt: excerpt.trim() || undefined,
         tags: parseTags(tags),
@@ -196,6 +245,55 @@ export default function NewArticlePage() {
               <ImagePlus className="h-7 w-7" />
               คลิกเพื่ออัปโหลดรูปภาพ (ไม่เกิน 10MB)
             </button>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              ไฟล์แนบ (ทุกนามสกุล ไม่เกิน 10MB ต่อไฟล์)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              loading={uploading}
+              disabled={!!submitting}
+            >
+              {!uploading && <Paperclip className="h-4 w-4 text-primary" />}
+              {uploading ? "กำลังอัปโหลด..." : "แนบไฟล์"}
+            </Button>
+            {attachments.length > 0 && (
+              <ul className="mt-2 space-y-1.5">
+                {attachments.map((a) => (
+                  <li
+                    key={a.url}
+                    className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm"
+                  >
+                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1 truncate">{a.filename}</span>
+                    <button
+                      type="button"
+                      aria-label="ลบไฟล์แนบ"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((x) => x.url !== a.url),
+                        )
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <FormField

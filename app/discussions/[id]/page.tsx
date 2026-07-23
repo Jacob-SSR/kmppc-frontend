@@ -19,6 +19,7 @@ import {
   VenetianMask,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
+import { RichText } from "@/components/rich-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -240,7 +241,7 @@ export default function DiscussionDetailPage() {
             </span>
           </div>
           <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">
-            {r.content}
+            <RichText text={r.content} />
           </p>
           <div className="mt-2.5 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -343,7 +344,7 @@ export default function DiscussionDetailPage() {
             </div>
           ) : (
             <p className="mt-5 whitespace-pre-line text-[15px] leading-relaxed">
-              {d.content}
+              <RichText text={d.content} />
             </p>
           )}
 

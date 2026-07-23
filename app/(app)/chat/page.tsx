@@ -14,6 +14,7 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RichText } from "@/components/rich-text";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
 import {
@@ -115,6 +116,38 @@ export default function ChatPage() {
     e.preventDefault();
     if (!text.trim() || !activeId) return;
     sendMutation.mutate();
+  }
+
+  // แนบไฟล์ในแชท — อัปโหลดแล้วส่งเป็นข้อความลิงก์
+  const chatFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  async function attachFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file || !activeId) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("ไฟล์ใหญ่เกิน 10MB", file.name);
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post<{ url: string; filename?: string }>(
+        "/upload",
+        formData,
+      );
+      await api.post(`/chat/conversations/${activeId}/messages`, {
+        message: `📎 ${data.filename ?? file.name}\n${data.url}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    } catch (err) {
+      toast.error("ส่งไฟล์ไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setUploadingFile(false);
+      if (chatFileRef.current) chatFileRef.current.value = "";
+    }
   }
 
   // เรียงเก่า → ใหม่ (API ส่งใหม่ → เก่า)
@@ -311,13 +344,20 @@ export default function ChatPage() {
                     {!mine && <Avatar name={fullName(m.sender)} size="sm" />}
                     <div
                       className={cn(
-                        "max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                        "max-w-[70%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                         mine
                           ? "rounded-br-md bg-primary-dark text-white"
                           : "rounded-bl-md border border-border bg-card",
                       )}
                     >
-                      {m.message}
+                      <RichText
+                        text={m.message}
+                        linkClassName={
+                          mine
+                            ? "text-white hover:opacity-80"
+                            : "text-primary hover:opacity-80"
+                        }
+                      />
                       <span
                         className={cn(
                           "mt-1 block text-right text-[10px]",
@@ -337,16 +377,23 @@ export default function ChatPage() {
               className="flex items-center gap-2 border-t border-border bg-card p-3"
               onSubmit={submit}
             >
+              <input
+                ref={chatFileRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => attachFile(e.target.files)}
+              />
               <Button
                 variant="ghost"
                 size="icon"
                 type="button"
                 aria-label="แนบไฟล์"
-                onClick={() =>
-                  toast.info("ยังไม่รองรับ", "การแนบไฟล์อยู่ระหว่างการพัฒนา")
-                }
+                loading={uploadingFile}
+                onClick={() => chatFileRef.current?.click()}
               >
-                <Paperclip className="h-5 w-5 text-muted-foreground" />
+                {!uploadingFile && (
+                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                )}
               </Button>
               <Input
                 placeholder="พิมพ์ข้อความ..."

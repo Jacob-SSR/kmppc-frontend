@@ -116,7 +116,7 @@ export default function Home() {
 
       {/* Hero + Search */}
       <section className="relative overflow-hidden bg-gradient-to-br from-secondary via-background to-accent/60">
-        <div className="mx-auto max-w-7xl px-4 py-14 lg:px-6 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 pt-14 pb-20 lg:px-6 lg:pt-20 lg:pb-24">
           <div className="max-w-2xl">
             <h1 className="text-3xl font-bold leading-tight text-primary-dark lg:text-5xl">
               ระบบจัดการองค์ความรู้
@@ -170,7 +170,7 @@ export default function Home() {
       </section>
 
       {/* Category grid */}
-      <section className="mx-auto -mt-8 w-full max-w-7xl px-4 lg:px-6">
+      <section className="relative z-10 mx-auto -mt-8 w-full max-w-7xl px-4 lg:px-6">
         <Card className="grid grid-cols-2 divide-border sm:grid-cols-4 lg:grid-cols-8 lg:divide-x">
           {(categories.data ?? []).slice(0, 7).map((c) => {
             const Icon = categoryIcon(c.category_name);
