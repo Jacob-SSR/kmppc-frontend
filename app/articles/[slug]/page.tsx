@@ -7,11 +7,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bookmark,
   Clock,
+  Download,
   Eye,
   Flag,
   ImagePlus,
   MessageCircle,
   Lock,
+  MousePointerClick,
   PencilLine,
   Send,
   ThumbsUp,
@@ -215,6 +217,31 @@ export default function ArticleDetailPage() {
     onError: (err) => handleAuthError(err, "กดถูกใจ"),
   });
 
+  // นับยอดกดลิงก์ (kind=link) / ดาวน์โหลดไฟล์แนบ (kind=file) ในเนื้อหาบทความ
+  // ส่งแบบ fire-and-forget ไม่ขวางการเปิดลิงก์ — นับเฉพาะผู้ใช้ที่ login
+  function handleContentClick(e: React.MouseEvent) {
+    const el = e.target as HTMLElement;
+    const anchor = el.closest?.("a");
+    if (!anchor || !article.data || me.isError) return;
+    const href = anchor.getAttribute("href") ?? "";
+    if (!href || href.startsWith("#")) return;
+    const isFile = /\/uploads\/|res\.cloudinary\.com/.test(href);
+    const kind = isFile ? "file" : "link";
+    api.post(`/articles/${article.data.id}/track`, { kind }).catch(() => {});
+    // อัปเดตยอดบนหน้าให้เห็นทันทีโดยไม่ต้อง refetch
+    queryClient.setQueryData<typeof article.data>(["article", slug], (old) =>
+      old
+        ? {
+            ...old,
+            link_click_count:
+              (old.link_click_count ?? 0) + (kind === "link" ? 1 : 0),
+            file_download_count:
+              (old.file_download_count ?? 0) + (kind === "file" ? 1 : 0),
+          }
+        : old,
+    );
+  }
+
   function submitReport() {
     if (!reportReason.trim()) {
       toast.error("กรุณาระบุเหตุผลในการรายงาน");
@@ -298,6 +325,20 @@ export default function ArticleDetailPage() {
               <span className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4" /> {a.view_count} ครั้ง
               </span>
+              <span
+                className="flex items-center gap-1.5"
+                title="ยอดกดลิงก์ในบทความ"
+              >
+                <MousePointerClick className="h-4 w-4" /> กดลิงก์{" "}
+                {a.link_click_count ?? 0}
+              </span>
+              <span
+                className="flex items-center gap-1.5"
+                title="ยอดดาวน์โหลดไฟล์แนบ"
+              >
+                <Download className="h-4 w-4" /> ดาวน์โหลด{" "}
+                {a.file_download_count ?? 0}
+              </span>
             </div>
 
             {a.cover_image && (
@@ -336,7 +377,10 @@ export default function ArticleDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-6 space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+              <div
+                className="mt-6 space-y-4 text-[15px] leading-relaxed whitespace-pre-wrap"
+                onClick={handleContentClick}
+              >
                 <RichText text={a.content} />
               </div>
             )}

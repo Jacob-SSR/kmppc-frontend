@@ -61,6 +61,9 @@ export type Article = {
   // มีเฉพาะหน้า detail เมื่อผู้ใช้ login อยู่
   liked_by_me?: boolean;
   bookmarked_by_me?: boolean;
+  // ยอดกดลิงก์ / ยอดดาวน์โหลดไฟล์ในเนื้อหา (มีเฉพาะหน้า detail)
+  link_click_count?: number;
+  file_download_count?: number;
 };
 
 export type ArticleComment = {
