@@ -310,7 +310,16 @@ export default function DiscussionDetailPage() {
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">{name}</p>
+            {!r.is_anonymous && r.author.id ? (
+              <Link
+                href={`/users/${r.author.id}`}
+                className="text-sm font-semibold hover:text-primary hover:underline"
+              >
+                {name}
+              </Link>
+            ) : (
+              <p className="text-sm font-semibold">{name}</p>
+            )}
             <span className="text-xs text-muted-foreground">
               {timeAgo(r.created_at)}
             </span>
@@ -381,7 +390,16 @@ export default function DiscussionDetailPage() {
               <Avatar name={authorName} />
             )}
             <div className="text-sm">
-              <p className="font-semibold">{authorName}</p>
+              {!me.isError && !d.is_anonymous && d.author.id ? (
+                <Link
+                  href={`/users/${d.author.id}`}
+                  className="font-semibold hover:text-primary hover:underline"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <p className="font-semibold">{authorName}</p>
+              )}
               <p className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" /> {timeAgo(d.created_at)}

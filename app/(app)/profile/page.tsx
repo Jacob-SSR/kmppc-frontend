@@ -36,6 +36,7 @@ function ProfileContent({ user: u }: { user: Me }) {
   const [form, setForm] = useState({
     fname: u.fname,
     lname: u.lname,
+    display_name: u.display_name ?? "",
     phone: u.phone ?? "",
     position: u.position ?? "",
   });
@@ -46,6 +47,8 @@ function ProfileContent({ user: u }: { user: Me }) {
       api.patch("/users/me", {
         fname: form.fname.trim(),
         lname: form.lname.trim(),
+        // ส่งค่าว่างได้ = กลับไปแสดงชื่อจริง
+        display_name: form.display_name.trim(),
         phone: form.phone.trim() || undefined,
         position: form.position.trim() || undefined,
       }),
@@ -89,10 +92,13 @@ function ProfileContent({ user: u }: { user: Me }) {
     <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
       {/* บัตรโปรไฟล์ */}
       <Card className="p-6 text-center">
-        <Avatar name={u.fname} size="lg" className="mx-auto" />
-        <p className="mt-3 font-bold">
-          {u.fname} {u.lname}
-        </p>
+        <Avatar name={u.display_name || u.fname} size="lg" className="mx-auto" />
+        <p className="mt-3 font-bold">{u.display_name || `${u.fname} ${u.lname}`}</p>
+        {u.display_name && (
+          <p className="text-xs text-muted-foreground">
+            ชื่อจริง: {u.fname} {u.lname}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">{u.position}</p>
         <Badge variant="primary" className="mt-2 gap-1">
           <ShieldCheck className="h-3 w-3" />
@@ -131,6 +137,22 @@ function ProfileContent({ user: u }: { user: Me }) {
         <Card className="p-6">
           <h2 className="font-bold">แก้ไขข้อมูลส่วนตัว</h2>
           <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={submit} noValidate>
+            <FormField
+              label="ชื่อที่แสดงในเว็บ"
+              htmlFor="display_name"
+              hint="แสดงตามโพสต์/คอมเมนต์แทนชื่อจริง — เว้นว่างเพื่อใช้ชื่อจริง"
+            >
+              <Input
+                id="display_name"
+                placeholder="เช่น หมอต้นไม้, พี่หมี IT"
+                value={form.display_name}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, display_name: e.target.value }))
+                }
+                disabled={saveMutation.isPending}
+              />
+            </FormField>
+            <div className="hidden sm:block" />
             <FormField label="ชื่อ" required htmlFor="fname" error={errors.fname}>
               <Input
                 id="fname"

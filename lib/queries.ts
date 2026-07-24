@@ -16,8 +16,22 @@ export type Author = {
   id: string | null;
   fname: string;
   lname: string | null;
+  display_name?: string | null;
   position: string | null;
   profile_image: string | null;
+};
+
+/** โปรไฟล์สาธารณะจาก GET /users/profile/:id */
+export type UserProfile = {
+  id: string;
+  fname: string;
+  lname: string;
+  display_name: string | null;
+  position: string | null;
+  profile_image: string | null;
+  created_at: string;
+  department: { id: string; dept_name: string } | null;
+  _count: { articles: number; discussions: number };
 };
 
 export type Department = {
@@ -111,6 +125,7 @@ export type Me = {
   email: string;
   fname: string;
   lname: string;
+  display_name?: string | null;
   phone: string | null;
   position: string | null;
   profile_image: string | null;
@@ -368,10 +383,20 @@ export type DirectoryUser = {
   id: string;
   fname: string;
   lname: string | null;
+  display_name?: string | null;
   position: string | null;
   profile_image: string | null;
   department: { dept_name: string } | null;
 };
+
+export function useUserProfile(id: string | undefined) {
+  return useQuery({
+    queryKey: ["user-profile", id],
+    queryFn: async () =>
+      (await api.get<UserProfile>(`/users/profile/${id}`)).data,
+    enabled: !!id,
+  });
+}
 
 /** รายชื่อเพื่อนร่วมงานสำหรับเริ่มแชท (ต้อง login) */
 export function useDirectory(q: string, enabled = true) {

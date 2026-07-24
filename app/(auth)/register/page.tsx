@@ -22,10 +22,25 @@ import {
   runRules,
 } from "@/lib/validation";
 
-const positions = ["เจ้าหน้าที่", "พยาบาล", "แพทย์", "นักเทคนิคการแพทย์", "อื่น ๆ"];
+const positions = [
+  "แพทย์",
+  "ทันตแพทย์",
+  "เภสัชกร",
+  "พยาบาลวิชาชีพ",
+  "ผู้ช่วยพยาบาล",
+  "นักเทคนิคการแพทย์",
+  "นักรังสีการแพทย์",
+  "นักกายภาพบำบัด",
+  "แพทย์แผนไทย",
+  "นักวิชาการสาธารณสุข",
+  "นักวิชาการคอมพิวเตอร์",
+  "เจ้าพนักงานธุรการ",
+  "เจ้าหน้าที่",
+  "อื่น ๆ",
+];
 
 type FieldName =
-  | "employee_no"
+  | "display_name"
   | "fname"
   | "lname"
   | "email"
@@ -39,7 +54,7 @@ type FieldName =
 type Errors = Partial<Record<FieldName, string>>;
 
 const initialValues = {
-  employee_no: "",
+  display_name: "",
   fname: "",
   lname: "",
   email: "",
@@ -69,10 +84,7 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const nextErrors = collectErrors<FieldName>({
-      employee_no: runRules(
-        values.employee_no,
-        required("กรุณากรอกเลขประจำตัวพนักงาน"),
-      ),
+      display_name: null, // ไม่บังคับ — ไม่มีกติกา validate
       fname: runRules(values.fname, required("กรุณากรอกชื่อ")),
       lname: runRules(values.lname, required("กรุณากรอกนามสกุล")),
       email: runRules(values.email, required("กรุณากรอกอีเมล"), email()),
@@ -106,7 +118,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await api.post("/auth/register", {
-        employee_no: values.employee_no.trim(),
+        display_name: values.display_name.trim() || undefined,
         fname: values.fname.trim(),
         lname: values.lname.trim(),
         email: values.email.trim(),
@@ -144,19 +156,16 @@ export default function RegisterPage() {
 
         <form className="mt-5 space-y-4" onSubmit={handleSubmit} noValidate>
           <FormField
-            label="เลขประจำตัวพนักงาน"
-            required
-            htmlFor="employee_no"
-            error={errors.employee_no}
+            label="ชื่อที่แสดงในเว็บ"
+            htmlFor="display_name"
+            hint="ตั้งชื่ออะไรก็ได้ ชื่อนี้จะแสดงตามโพสต์/คอมเมนต์แทนชื่อจริง — เว้นว่างเพื่อใช้ชื่อจริง (ชื่อจริงจะเห็นได้ในหน้าโปรไฟล์)"
           >
             <Input
-              id="employee_no"
-              name="employee_no"
-              placeholder="กรอกเลขประจำตัวพนักงาน"
-              value={values.employee_no}
-              onChange={(e) => setValue("employee_no", e.target.value)}
-              aria-invalid={!!errors.employee_no}
-              className={fieldInvalidClass(errors.employee_no)}
+              id="display_name"
+              name="display_name"
+              placeholder="เช่น หมอต้นไม้, พี่หมี IT"
+              value={values.display_name}
+              onChange={(e) => setValue("display_name", e.target.value)}
               disabled={submitting}
             />
           </FormField>

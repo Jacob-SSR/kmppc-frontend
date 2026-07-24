@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -38,6 +39,14 @@ function conversationName(c: Conversation, myId: string | undefined): string {
 }
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChatContent />
+    </Suspense>
+  );
+}
+
+function ChatContent() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const me = useMe();
@@ -123,6 +132,48 @@ export default function ChatPage() {
     onError: (err) =>
       toast.error("เริ่มการสนทนาไม่สำเร็จ", getApiErrorMessage(err)),
   });
+
+  // มาจากปุ่ม "ส่งข้อความ" ในหน้าโปรไฟล์ (/chat?user=<id>) — เปิด DM ให้อัตโนมัติ
+  const targetUserId = useSearchParams().get("user");
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!targetUserId || autoStartedRef.current || !me.data) return;
+    autoStartedRef.current = true;
+    startChatMutation.mutate({ type: "DIRECT", member_ids: [targetUserId] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetUserId, me.data]);
+
+  // ---------- แอดเพื่อนด้วยรหัสผู้ใช้ (8 ตัวแรกของ id) ----------
+  const [friendCode, setFriendCode] = useState("");
+  const [addingByCode, setAddingByCode] = useState(false);
+  const myCode = me.data?.id.slice(0, 8) ?? "";
+
+  async function addByCode() {
+    const code = friendCode.trim();
+    if (code.length < 6) {
+      toast.error("รหัสไม่ถูกต้อง", "รหัสเพื่อนมีอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+    setAddingByCode(true);
+    try {
+      const { data: friend } = await api.get<{ id: string; fname: string }>(
+        `/users/by-code/${encodeURIComponent(code)}`,
+      );
+      setFriendCode("");
+      startChatMutation.mutate({ type: "DIRECT", member_ids: [friend.id] });
+    } catch (err) {
+      toast.error("แอดเพื่อนไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setAddingByCode(false);
+    }
+  }
+
+  function copyMyCode() {
+    navigator.clipboard
+      .writeText(myCode)
+      .then(() => toast.success("คัดลอกรหัสเพื่อนแล้ว", "ส่งให้เพื่อนไปแอดได้เลย"))
+      .catch(() => toast.error("คัดลอกไม่สำเร็จ"));
+  }
 
   function toggleMember(id: string, name: string) {
     setSelectedMembers((prev) =>
@@ -320,6 +371,48 @@ export default function ChatPage() {
               >
                 กลุ่ม
               </button>
+            </div>
+          )}
+          {newChatMode && !groupMode && (
+            <div className="mt-2 space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-2.5">
+              <button
+                type="button"
+                onClick={copyMyCode}
+                className="flex w-full items-center justify-between text-xs text-muted-foreground transition-colors hover:text-primary"
+                title="คัดลอกรหัสเพื่อนของฉัน"
+              >
+                <span>
+                  รหัสเพื่อนของฉัน:{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {myCode || "…"}
+                  </span>
+                </span>
+                <span className="text-primary">คัดลอก</span>
+              </button>
+              <div className="flex gap-1.5">
+                <Input
+                  placeholder="กรอกรหัสเพื่อนเพื่อเริ่มแชท"
+                  className="h-8 flex-1 font-mono text-sm"
+                  value={friendCode}
+                  onChange={(e) => setFriendCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addByCode();
+                    }
+                  }}
+                  disabled={addingByCode}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8"
+                  onClick={addByCode}
+                  loading={addingByCode}
+                >
+                  แอด
+                </Button>
+              </div>
             </div>
           )}
           <div className="relative mt-2">

@@ -317,7 +317,16 @@ export default function ArticleDetailPage() {
             <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-border pb-5 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <User className="h-4 w-4" />
-                {isGuest ? "สมาชิกในระบบ" : fullName(a.author)}
+                {isGuest || !a.author.id ? (
+                  <>{isGuest ? "สมาชิกในระบบ" : fullName(a.author)}</>
+                ) : (
+                  <Link
+                    href={`/users/${a.author.id}`}
+                    className="hover:text-primary hover:underline"
+                  >
+                    {fullName(a.author)}
+                  </Link>
+                )}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" /> {timeAgo(a.published_at ?? a.created_at)}
@@ -523,7 +532,16 @@ export default function ArticleDetailPage() {
                     <Avatar name={name} size="sm" />
                     <div className="flex-1 rounded-xl bg-muted p-3.5">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">{name}</p>
+                        {c.user.id ? (
+                          <Link
+                            href={`/users/${c.user.id}`}
+                            className="text-sm font-semibold hover:text-primary hover:underline"
+                          >
+                            {name}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold">{name}</p>
+                        )}
                         <span className="text-xs text-muted-foreground">
                           {timeAgo(c.created_at)}
                         </span>

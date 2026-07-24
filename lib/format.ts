@@ -10,10 +10,23 @@ export function timeAgo(iso: string | null | undefined): string {
 }
 
 export function fullName(
-  author: { fname: string; lname: string | null } | null | undefined,
+  author:
+    | { fname: string; lname: string | null; display_name?: string | null }
+    | null
+    | undefined,
 ): string {
   if (!author) return "ไม่ระบุตัวตน";
+  // ชื่อที่แสดง (สไตล์เฟซบุ๊ก) มาก่อนชื่อจริง — ชื่อจริงดูได้ในหน้าโปรไฟล์
+  if (author.display_name?.trim()) return author.display_name.trim();
   return `${author.fname} ${author.lname ?? ""}`.trim() || "ไม่ระบุตัวตน";
+}
+
+/** ชื่อจริงเสมอ (ใช้ในหน้าโปรไฟล์) */
+export function realName(
+  author: { fname: string; lname: string | null } | null | undefined,
+): string {
+  if (!author) return "-";
+  return `${author.fname} ${author.lname ?? ""}`.trim() || "-";
 }
 
 export function initial(name: string): string {
