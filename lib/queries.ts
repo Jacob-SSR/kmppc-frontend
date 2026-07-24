@@ -238,6 +238,9 @@ export type ListParams = {
   page?: number;
   limit?: number;
   category_id?: string;
+  tag_id?: string;
+  // latest | oldest | views | likes | comments (บทความ) | replies (กระทู้)
+  sort?: string;
   q?: string;
 };
 

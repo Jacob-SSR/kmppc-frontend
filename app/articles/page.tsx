@@ -16,31 +16,49 @@ import {
   ThumbsUp,
   User,
 } from "lucide-react";
-import { CategoryFilter } from "@/components/category-filter";
+import {
+  CategoryFilter,
+  DEFAULT_FILTER,
+  type FilterValue,
+} from "@/components/category-filter";
 import { PublicShell } from "@/components/public-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useArticles, useCategories } from "@/lib/queries";
+import { useArticles, useCategories, useTags } from "@/lib/queries";
 import { useDebounced } from "@/lib/use-debounce";
 import { formatNum, fullName, timeAgo } from "@/lib/format";
 
 const PAGE_SIZE = 12;
 
+const SORTS = [
+  { id: "latest", label: "ล่าสุด" },
+  { id: "oldest", label: "เก่าสุด" },
+  { id: "views", label: "ยอดเข้าชมมาก" },
+  { id: "likes", label: "ถูกใจมาก" },
+  { id: "comments", label: "ความคิดเห็นมาก" },
+];
+
 function ArticlesContent() {
   const initialCategory = useSearchParams().get("category") ?? "all";
-  const [category, setCategory] = useState(initialCategory);
+  const [filter, setFilter] = useState<FilterValue>({
+    ...DEFAULT_FILTER,
+    category: initialCategory,
+  });
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const debouncedQ = useDebounced(q);
 
   const categories = useCategories();
+  const tags = useTags();
   const articles = useArticles({
     page,
     limit: PAGE_SIZE,
     q: debouncedQ.trim() || undefined,
-    category_id: category === "all" ? undefined : category,
+    category_id: filter.category === "all" ? undefined : filter.category,
+    tag_id: filter.tag === "all" ? undefined : filter.tag,
+    sort: filter.sort === "latest" ? undefined : filter.sort,
   });
 
   const total = articles.data?.total ?? 0;
@@ -83,14 +101,20 @@ function ArticlesContent() {
 
           <div className="mt-4">
             <CategoryFilter
-              options={(categories.data ?? []).map((c) => ({
+              categories={(categories.data ?? []).map((c) => ({
                 id: c.id,
                 label: c.category_name,
                 count: c.article_count,
               }))}
-              value={category}
-              onChange={(id) => {
-                setCategory(id);
+              tags={(tags.data ?? []).map((t) => ({
+                id: t.id,
+                label: t.tag_name,
+                count: t.article_count,
+              }))}
+              sorts={SORTS}
+              value={filter}
+              onApply={(next) => {
+                setFilter(next);
                 setPage(1);
               }}
               loading={categories.isLoading}
