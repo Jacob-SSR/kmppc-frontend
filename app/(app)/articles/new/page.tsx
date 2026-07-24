@@ -4,12 +4,15 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Bold,
   Eye,
   FilePlus2,
   ImagePlus,
+  Italic,
   Paperclip,
   Save,
   Send,
+  Underline,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,6 +69,38 @@ export default function NewArticlePage() {
   }
 
   const imageCount = (content.match(/!\[/g) ?? []).length;
+
+  // จัดรูปแบบตัวอักษรแบบ Word — ครอบข้อความที่เลือกด้วยเครื่องหมายจัดรูปแบบ
+  function wrapSelection(prefix: string, suffix: string, placeholder: string) {
+    const el = contentRef.current;
+    if (!el) return;
+    const s = el.selectionStart ?? 0;
+    const e = el.selectionEnd ?? s;
+    const selected = content.slice(s, e) || placeholder;
+    setContent(content.slice(0, s) + prefix + selected + suffix + content.slice(e));
+    if (errors.content) setErrors((prev) => ({ ...prev, content: undefined }));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(s + prefix.length, s + prefix.length + selected.length);
+    });
+  }
+
+  // ขนาดตัวอักษรของบรรทัดที่เคอร์เซอร์อยู่ (0 = ปกติ, 1-3 = หัวข้อใหญ่→ย่อย)
+  function setLineHeading(level: number) {
+    const el = contentRef.current;
+    const pos = el?.selectionStart ?? content.length;
+    const lineStart = content.lastIndexOf("\n", pos - 1) + 1;
+    let lineEnd = content.indexOf("\n", pos);
+    if (lineEnd === -1) lineEnd = content.length;
+    const line = content.slice(lineStart, lineEnd).replace(/^#{1,3}\s+/, "");
+    const nextLine = level > 0 ? `${"#".repeat(level)} ${line}` : line;
+    setContent(content.slice(0, lineStart) + nextLine + content.slice(lineEnd));
+    requestAnimationFrame(() => {
+      el?.focus();
+      const p = lineStart + nextLine.length;
+      el?.setSelectionRange(p, p);
+    });
+  }
 
   // รูปหน้าปก — อัปโหลดผ่าน POST /upload แล้วส่ง url ไปกับ cover_image
   const [cover, setCover] = useState<string | null>(null);
@@ -382,8 +417,64 @@ export default function NewArticlePage() {
             required
             htmlFor="content"
             error={errors.content}
-            hint="วางเคอร์เซอร์ตรงไหนแล้วกด แทรกรูป/แนบไฟล์ — รูปและไฟล์จะแทรกตรงนั้น สลับข้อความ+รูป+ลิงก์ได้ตามต้องการ"
+            hint="ลากคลุมข้อความแล้วกดปุ่มจัดรูปแบบ / วางเคอร์เซอร์แล้วกดแทรกรูป-แนบไฟล์ ตรงตำแหน่งที่ต้องการ — ดูผลลัพธ์ได้ที่ตัวอย่างด้านล่าง"
           >
+            <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/40 p-1.5">
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value !== "") setLineHeading(Number(e.target.value));
+                }}
+                disabled={!!submitting}
+                className="h-8 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="ขนาดตัวอักษร"
+              >
+                <option value="" disabled>
+                  ขนาดตัวอักษร
+                </option>
+                <option value="1">หัวข้อใหญ่</option>
+                <option value="2">หัวข้อรอง</option>
+                <option value="3">หัวข้อย่อย</option>
+                <option value="0">ปกติ</option>
+              </select>
+              <span className="mx-1 h-5 w-px bg-border" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="ตัวหนา"
+                title="ตัวหนา"
+                disabled={!!submitting}
+                onClick={() => wrapSelection("**", "**", "ข้อความตัวหนา")}
+              >
+                <Bold className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="ตัวเอียง"
+                title="ตัวเอียง"
+                disabled={!!submitting}
+                onClick={() => wrapSelection("*", "*", "ข้อความตัวเอียง")}
+              >
+                <Italic className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="ขีดเส้นใต้"
+                title="ขีดเส้นใต้"
+                disabled={!!submitting}
+                onClick={() => wrapSelection("__", "__", "ข้อความขีดเส้นใต้")}
+              >
+                <Underline className="h-4 w-4" />
+              </Button>
+            </div>
             <Textarea
               ref={contentRef}
               id="content"
