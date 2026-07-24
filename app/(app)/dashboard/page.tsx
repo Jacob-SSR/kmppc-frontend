@@ -170,6 +170,15 @@ export default function DashboardPage() {
                     </Button>
                   </>
                 )}
+                <Link href={`/articles/${a.slug}/edit`}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                  >
+                    แก้ไข
+                  </Button>
+                </Link>
               </div>
             ))}
           </div>

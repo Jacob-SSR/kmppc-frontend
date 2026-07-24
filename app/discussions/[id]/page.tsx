@@ -14,6 +14,7 @@ import {
   ImagePlus,
   MessageCircle,
   Lock,
+  PencilLine,
   Send,
   ThumbsUp,
   Trash2,
@@ -466,6 +467,14 @@ export default function DiscussionDetailPage() {
             </Button>
             <ShareMenu title={d.title} />
             <div className="ml-auto flex items-center gap-2">
+              {canDelete && (
+                <Link href={`/discussions/${d.id}/edit`}>
+                  <Button variant="ghost" size="sm">
+                    <PencilLine className="h-4 w-4 text-primary" />
+                    แก้ไข
+                  </Button>
+                </Link>
+              )}
               {canDelete && (
                 <Button
                   variant="ghost"
