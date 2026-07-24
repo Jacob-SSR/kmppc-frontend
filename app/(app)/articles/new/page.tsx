@@ -92,15 +92,20 @@ export default function NewArticlePage() {
         tags: parseTags(tags),
         status,
       });
-      if (status === "PUBLISHED") {
-        toast.success("เผยแพร่บทความสำเร็จ", "ขอบคุณที่ร่วมแบ่งปันความรู้");
-      } else {
-        toast.success("บันทึกฉบับร่างแล้ว", "กลับมาแก้ไขต่อได้ทุกเมื่อ");
-      }
       // ล้าง cache รายการเพื่อให้บทความใหม่โผล่ทันทีโดยไม่ต้อง refresh
       queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["my-articles"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
-      router.push("/articles");
+      if (status === "PUBLISHED") {
+        toast.success("เผยแพร่บทความสำเร็จ", "ขอบคุณที่ร่วมแบ่งปันความรู้");
+        router.push("/articles");
+      } else {
+        toast.success(
+          "บันทึกฉบับร่างแล้ว",
+          "ดูฉบับร่างได้ที่หน้าหลักของคุณ กด \"เผยแพร่\" เมื่อพร้อม",
+        );
+        router.push("/dashboard");
+      }
     } catch (err) {
       if (isUnauthorizedError(err)) {
         toast.error("กรุณาเข้าสู่ระบบ", "ต้องเข้าสู่ระบบก่อนจึงจะเขียนบทความได้");
