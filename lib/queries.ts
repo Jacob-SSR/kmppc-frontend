@@ -273,6 +273,9 @@ export function useComments(articleId: string | undefined) {
     queryFn: async () =>
       (await api.get<ArticleComment[]>(`/articles/${articleId}/comments`)).data,
     enabled: !!articleId,
+    // เห็นคอมเมนต์คนอื่นแบบเกือบ realtime — endpoint นี้อ่านอย่างเดียว poll ได้ปลอดภัย
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   });
 }
 

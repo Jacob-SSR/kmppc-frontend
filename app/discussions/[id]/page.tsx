@@ -107,18 +107,25 @@ export default function DiscussionDetailPage() {
     onError: (err) => handleAuthError(err, "บุ๊คมาร์ค"),
   });
 
-  // modal ยืนยันลบ / รายงาน
+  // modal ยืนยันลบ / รายงาน — reportReplyId ระบุว่ารายงานคำตอบ (null = รายงานกระทู้)
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [reportReplyId, setReportReplyId] = useState<string | null>(null);
 
   const reportMutation = useMutation({
     mutationFn: async (reason: string) =>
-      api.post("/reports", { reason, discussion_id: id }),
+      api.post(
+        "/reports",
+        reportReplyId
+          ? { reason, reply_id: reportReplyId }
+          : { reason, discussion_id: id },
+      ),
     onSuccess: () => {
       toast.success("ส่งรายงานแล้ว", "ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด");
       setReportOpen(false);
       setReportReason("");
+      setReportReplyId(null);
     },
     onError: (err) => handleAuthError(err, "รายงาน"),
   });
@@ -317,6 +324,15 @@ export default function DiscussionDetailPage() {
               onClick={() => startReplyTo(r.parent_reply_id ?? r.id, name)}
             >
               ตอบกลับ
+            </button>
+            <button
+              className="hover:text-destructive"
+              onClick={() => {
+                setReportReplyId(r.id);
+                setReportOpen(true);
+              }}
+            >
+              รายงาน
             </button>
             {canPickBest && !r.is_best_answer && !r.parent_reply_id && (
               <button
@@ -609,7 +625,7 @@ export default function DiscussionDetailPage() {
 
       <ConfirmDialog
         open={reportOpen}
-        title="รายงานกระทู้นี้"
+        title={reportReplyId ? "รายงานคำตอบนี้" : "รายงานกระทู้นี้"}
         description="โปรดระบุเหตุผล ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด"
         confirmLabel="ส่งรายงาน"
         loading={reportMutation.isPending}
@@ -617,6 +633,7 @@ export default function DiscussionDetailPage() {
         onCancel={() => {
           setReportOpen(false);
           setReportReason("");
+          setReportReplyId(null);
         }}
       >
         <Textarea

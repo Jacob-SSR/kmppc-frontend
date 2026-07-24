@@ -157,18 +157,25 @@ export default function ArticleDetailPage() {
     onError: (err) => handleAuthError(err, "บุ๊คมาร์ค"),
   });
 
-  // modal ยืนยันลบ / รายงาน
+  // modal ยืนยันลบ / รายงาน — reportCommentId ระบุว่ารายงานคอมเมนต์ (null = รายงานบทความ)
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [reportCommentId, setReportCommentId] = useState<string | null>(null);
 
   const reportMutation = useMutation({
     mutationFn: async (reason: string) =>
-      api.post("/reports", { reason, article_id: article.data!.id }),
+      api.post(
+        "/reports",
+        reportCommentId
+          ? { reason, comment_id: reportCommentId }
+          : { reason, article_id: article.data!.id },
+      ),
     onSuccess: () => {
       toast.success("ส่งรายงานแล้ว", "ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด");
       setReportOpen(false);
       setReportReason("");
+      setReportCommentId(null);
     },
     onError: (err) => handleAuthError(err, "รายงาน"),
   });
@@ -491,6 +498,15 @@ export default function ArticleDetailPage() {
                         >
                           ตอบกลับ
                         </button>
+                        <button
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            setReportCommentId(c.id);
+                            setReportOpen(true);
+                          }}
+                        >
+                          รายงาน
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -554,7 +570,7 @@ export default function ArticleDetailPage() {
 
       <ConfirmDialog
         open={reportOpen}
-        title="รายงานบทความนี้"
+        title={reportCommentId ? "รายงานความคิดเห็นนี้" : "รายงานบทความนี้"}
         description="โปรดระบุเหตุผล ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด"
         confirmLabel="ส่งรายงาน"
         loading={reportMutation.isPending}
@@ -562,6 +578,7 @@ export default function ArticleDetailPage() {
         onCancel={() => {
           setReportOpen(false);
           setReportReason("");
+          setReportCommentId(null);
         }}
       >
         <Textarea
