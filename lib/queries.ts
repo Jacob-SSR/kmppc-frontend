@@ -250,6 +250,15 @@ export function useArticles(params: ListParams = {}) {
   });
 }
 
+/** บทความของฉันทั้งหมด รวมฉบับร่าง (ต้อง login) */
+export function useMyArticles() {
+  return useQuery({
+    queryKey: ["my-articles"],
+    queryFn: async () => (await api.get<Article[]>("/articles/mine")).data,
+    retry: false,
+  });
+}
+
 export function useArticle(slug: string) {
   return useQuery({
     queryKey: ["article", slug],

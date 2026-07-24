@@ -7,10 +7,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
-import { useAdminUsers, useMe } from "@/lib/queries";
+import { useAdminUsers, useMe, type Me } from "@/lib/queries";
 import { useDebounced } from "@/lib/use-debounce";
 
 export default function AdminUsersPage() {
@@ -20,6 +21,8 @@ export default function AdminUsersPage() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebounced(q);
   const users = useAdminUsers({ limit: 50, q: debouncedQ.trim() || undefined });
+  // บัญชีที่กำลังจะปิดการใช้งาน — ต้องยืนยันผ่าน modal ก่อน
+  const [confirmUser, setConfirmUser] = useState<Me | null>(null);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) =>
@@ -28,6 +31,7 @@ export default function AdminUsersPage() {
       toast.success(
         vars.is_active ? "เปิดใช้งานบัญชีแล้ว" : "ปิดการใช้งานบัญชีแล้ว",
       );
+      setConfirmUser(null);
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
     onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
@@ -129,10 +133,12 @@ export default function AdminUsersPage() {
                           u.is_active ? "ปิดการใช้งานบัญชี" : "เปิดใช้งานบัญชี"
                         }
                         onClick={() =>
-                          toggleMutation.mutate({
-                            id: u.id,
-                            is_active: !u.is_active,
-                          })
+                          u.is_active
+                            ? setConfirmUser(u)
+                            : toggleMutation.mutate({
+                                id: u.id,
+                                is_active: true,
+                              })
                         }
                         disabled={toggleMutation.isPending}
                       >
@@ -160,6 +166,20 @@ export default function AdminUsersPage() {
           </table>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={!!confirmUser}
+        danger
+        title={`ปิดการใช้งานบัญชี "${confirmUser?.fname ?? ""} ${confirmUser?.lname ?? ""}"?`}
+        description="ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง — ข้อมูลและโพสต์ของผู้ใช้ยังอยู่ครบ"
+        confirmLabel="ปิดการใช้งาน"
+        loading={toggleMutation.isPending}
+        onConfirm={() =>
+          confirmUser &&
+          toggleMutation.mutate({ id: confirmUser.id, is_active: false })
+        }
+        onCancel={() => setConfirmUser(null)}
+      />
     </div>
   );
 }

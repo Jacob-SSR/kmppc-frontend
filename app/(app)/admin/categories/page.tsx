@@ -6,6 +6,7 @@ import { Check, LayoutGrid, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
@@ -23,6 +24,7 @@ export default function AdminCategoriesPage() {
   const [newNameError, setNewNameError] = useState<string>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [confirmTarget, setConfirmTarget] = useState<Category | null>(null);
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["categories"] });
@@ -60,6 +62,7 @@ export default function AdminCategoriesPage() {
     mutationFn: async (id: string) => api.delete(`/categories/${id}`),
     onSuccess: () => {
       toast.success("ลบหมวดหมู่แล้ว");
+      setConfirmTarget(null);
       refetch();
     },
     onError: (err) =>
@@ -82,9 +85,7 @@ export default function AdminCategoriesPage() {
       );
       return;
     }
-    if (window.confirm(`ยืนยันลบหมวดหมู่ "${c.category_name}"?`)) {
-      deleteMutation.mutate(c.id);
-    }
+    setConfirmTarget(c);
   }
 
   return (
@@ -226,6 +227,17 @@ export default function AdminCategoriesPage() {
           </Card>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        danger
+        title={`ลบหมวดหมู่ "${confirmTarget?.category_name ?? ""}"?`}
+        description="การลบย้อนกลับไม่ได้ — ลบได้เฉพาะหมวดหมู่ที่ไม่มีบทความหรือกระทู้อยู่"
+        confirmLabel="ลบหมวดหมู่"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmTarget && deleteMutation.mutate(confirmTarget.id)}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
 }

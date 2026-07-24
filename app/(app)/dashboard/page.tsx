@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
   BookOpen,
@@ -18,11 +19,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
+import { api, getApiErrorMessage } from "@/lib/api";
 import {
   useArticles,
   useBookmarks,
   useDiscussions,
   useMe,
+  useMyArticles,
   useNotifications,
 } from "@/lib/queries";
 import { timeAgo } from "@/lib/format";
@@ -34,14 +38,26 @@ export default function DashboardPage() {
   const bookmarks = useBookmarks();
   const notifications = useNotifications({ limit: 1 });
 
-  // ยังไม่มี endpoint กรองตามผู้เขียน — กรองจากรายการเผยแพร่ล่าสุดฝั่ง client
-  const myArticles = (articles.data?.items ?? []).filter(
-    (a) => me.data && a.author.id === me.data.id,
-  );
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  // บทความของฉันทั้งหมดรวมฉบับร่าง — จาก GET /articles/mine
+  const mine = useMyArticles();
+  const myArticles = mine.data ?? [];
   const myDiscussions = (discussions.data?.items ?? []).filter(
     (d) => me.data && !d.is_anonymous && d.author.id === me.data.id,
   );
   const myLikes = myArticles.reduce((s, a) => s + a._count.likes, 0);
+
+  const publishMutation = useMutation({
+    mutationFn: async (id: string) =>
+      api.patch(`/articles/${id}`, { status: "PUBLISHED" }),
+    onSuccess: () => {
+      toast.success("เผยแพร่บทความแล้ว");
+      queryClient.invalidateQueries({ queryKey: ["my-articles"] });
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+    },
+    onError: (err) => toast.error("เผยแพร่ไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   const stats = [
     { label: "บทความของฉัน", value: myArticles.length, icon: FileText },
@@ -112,19 +128,18 @@ export default function DashboardPage() {
           <div className="mt-3 space-y-2">
             {myArticles.length === 0 && (
               <p className="p-2.5 text-sm text-muted-foreground">
-                ยังไม่มีบทความที่เผยแพร่ —{" "}
+                ยังไม่มีบทความ —{" "}
                 <Link href="/articles/new" className="text-primary hover:underline">
                   เริ่มเขียนบทความแรกเลย
                 </Link>
               </p>
             )}
-            {myArticles.slice(0, 5).map((a) => (
-              <Link
+            {myArticles.slice(0, 8).map((a) => (
+              <div
                 key={a.id}
-                href={`/articles/${a.slug}`}
                 className="flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted"
               >
-                <div className="min-w-0 flex-1">
+                <Link href={`/articles/${a.slug}`} className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{a.title}</p>
                   <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
@@ -138,9 +153,24 @@ export default function DashboardPage() {
                       {timeAgo(a.published_at ?? a.created_at)}
                     </span>
                   </p>
-                </div>
-                <Badge variant="primary">เผยแพร่แล้ว</Badge>
-              </Link>
+                </Link>
+                {a.status === "PUBLISHED" ? (
+                  <Badge variant="primary">เผยแพร่แล้ว</Badge>
+                ) : (
+                  <>
+                    <Badge variant="outline">ฉบับร่าง</Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => publishMutation.mutate(a.id)}
+                      disabled={publishMutation.isPending}
+                    >
+                      เผยแพร่
+                    </Button>
+                  </>
+                )}
+              </div>
             ))}
           </div>
 

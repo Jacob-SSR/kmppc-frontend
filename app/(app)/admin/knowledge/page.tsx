@@ -6,6 +6,7 @@ import { BookMarked, FilePlus2, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -43,6 +44,7 @@ export default function AdminKnowledgePage() {
     content: "",
   });
   const [errors, setErrors] = useState<Errors>({});
+  const [confirmTarget, setConfirmTarget] = useState<KnowledgeDoc | null>(null);
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["knowledge-docs"] });
@@ -69,6 +71,7 @@ export default function AdminKnowledgePage() {
     mutationFn: async (id: string) => api.delete(`/knowledge-documents/${id}`),
     onSuccess: () => {
       toast.success("ลบเอกสารแล้ว");
+      setConfirmTarget(null);
       refetch();
     },
     onError: (err) => toast.error("ลบเอกสารไม่สำเร็จ", getApiErrorMessage(err)),
@@ -86,9 +89,7 @@ export default function AdminKnowledgePage() {
   }
 
   function remove(d: KnowledgeDoc) {
-    if (window.confirm(`ยืนยันลบเอกสาร "${d.title}"?`)) {
-      deleteMutation.mutate(d.id);
-    }
+    setConfirmTarget(d);
   }
 
   return (
@@ -225,6 +226,17 @@ export default function AdminKnowledgePage() {
           </Card>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        danger
+        title={`ลบเอกสาร "${confirmTarget?.title ?? ""}"?`}
+        description="เอกสารจะถูกถอนออกจากฐานความรู้ AI ด้วย — การลบย้อนกลับไม่ได้"
+        confirmLabel="ลบเอกสาร"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmTarget && deleteMutation.mutate(confirmTarget.id)}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
 }

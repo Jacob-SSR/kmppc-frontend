@@ -19,6 +19,7 @@ import {
   Trash2,
   VenetianMask,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmojiPickerButton } from "@/components/emoji-picker";
 import { PublicShell } from "@/components/public-shell";
 import { RichText } from "@/components/rich-text";
@@ -106,11 +107,19 @@ export default function DiscussionDetailPage() {
     onError: (err) => handleAuthError(err, "บุ๊คมาร์ค"),
   });
 
+  // modal ยืนยันลบ / รายงาน
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+
   const reportMutation = useMutation({
     mutationFn: async (reason: string) =>
       api.post("/reports", { reason, discussion_id: id }),
-    onSuccess: () =>
-      toast.success("ส่งรายงานแล้ว", "ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด"),
+    onSuccess: () => {
+      toast.success("ส่งรายงานแล้ว", "ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด");
+      setReportOpen(false);
+      setReportReason("");
+    },
     onError: (err) => handleAuthError(err, "รายงาน"),
   });
 
@@ -206,9 +215,12 @@ export default function DiscussionDetailPage() {
     onError: (err) => handleAuthError(err, "เลือกคำตอบที่ดีที่สุด"),
   });
 
-  function report() {
-    const reason = window.prompt("โปรดระบุเหตุผลในการรายงานกระทู้นี้");
-    if (reason?.trim()) reportMutation.mutate(reason.trim());
+  function submitReport() {
+    if (!reportReason.trim()) {
+      toast.error("กรุณาระบุเหตุผลในการรายงาน");
+      return;
+    }
+    reportMutation.mutate(reportReason.trim());
   }
 
   function submitReply(e: React.FormEvent) {
@@ -440,10 +452,7 @@ export default function DiscussionDetailPage() {
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:bg-destructive/5"
-                  onClick={() => {
-                    if (window.confirm("ยืนยันลบกระทู้นี้?"))
-                      deleteMutation.mutate();
-                  }}
+                  onClick={() => setConfirmingDelete(true)}
                   loading={deleteMutation.isPending}
                 >
                   {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
@@ -454,7 +463,7 @@ export default function DiscussionDetailPage() {
                 variant="ghost"
                 size="sm"
                 className="text-muted-foreground"
-                onClick={report}
+                onClick={() => setReportOpen(true)}
                 loading={reportMutation.isPending}
               >
                 <Flag className="h-4 w-4" />
@@ -585,6 +594,38 @@ export default function DiscussionDetailPage() {
         </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        danger
+        title="ลบกระทู้นี้?"
+        description={`"${d.title}" และคำตอบทั้งหมดจะถูกลบ — การลบย้อนกลับไม่ได้`}
+        confirmLabel="ลบกระทู้"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+
+      <ConfirmDialog
+        open={reportOpen}
+        title="รายงานกระทู้นี้"
+        description="โปรดระบุเหตุผล ผู้ดูแลระบบจะตรวจสอบโดยเร็วที่สุด"
+        confirmLabel="ส่งรายงาน"
+        loading={reportMutation.isPending}
+        onConfirm={submitReport}
+        onCancel={() => {
+          setReportOpen(false);
+          setReportReason("");
+        }}
+      >
+        <Textarea
+          rows={3}
+          placeholder="เช่น เนื้อหาไม่เหมาะสม, สแปม..."
+          value={reportReason}
+          onChange={(e) => setReportReason(e.target.value)}
+          autoFocus
+        />
+      </ConfirmDialog>
     </PublicShell>
   );
 }
