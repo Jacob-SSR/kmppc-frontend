@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { RichEditor } from "@/components/rich-editor";
-import { Select } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
 import { useArticle, useCategories, useMe, type Article } from "@/lib/queries";
@@ -208,29 +208,25 @@ function EditArticleForm({ article }: { article: Article }) {
               htmlFor="category_id"
               error={errors.category_id}
             >
-              <Select
+              <Combobox
                 id="category_id"
+                options={(categories.data ?? []).map((c) => ({
+                  value: c.id,
+                  label: c.category_name,
+                }))}
                 value={categoryId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value);
+                onChange={(id) => {
+                  setCategoryId(id);
                   if (errors.category_id)
                     setErrors((prev) => ({ ...prev, category_id: undefined }));
                 }}
-                aria-invalid={!!errors.category_id}
-                className={fieldInvalidClass(errors.category_id)}
-                disabled={!!submitting || categories.isLoading}
-              >
-                <option value="" disabled>
-                  {categories.isLoading
-                    ? "กำลังโหลดหมวดหมู่..."
-                    : "เลือกหมวดหมู่"}
-                </option>
-                {categories.data?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.category_name}
-                  </option>
-                ))}
-              </Select>
+                placeholder="เลือกหมวดหมู่"
+                searchPlaceholder="พิมพ์ชื่อหมวดหมู่..."
+                emptyText="ไม่พบหมวดหมู่ที่ค้นหา"
+                invalid={!!errors.category_id}
+                disabled={!!submitting}
+                loading={categories.isLoading}
+              />
             </FormField>
             <FormField label="แท็ก (คั่นด้วยเครื่องหมายจุลภาค)" htmlFor="tags">
               <Input

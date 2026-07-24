@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
@@ -317,26 +318,21 @@ export default function RegisterPage() {
                   : undefined
               }
             >
-              <Select
+              <Combobox
                 id="dept_id"
-                name="dept_id"
+                options={(departments.data ?? []).map((d) => ({
+                  value: d.id,
+                  label: d.dept_name,
+                }))}
                 value={values.dept_id}
-                onChange={(e) => setValue("dept_id", e.target.value)}
-                aria-invalid={!!errors.dept_id}
-                className={`h-11 ${fieldInvalidClass(errors.dept_id)}`}
-                disabled={submitting || departments.isLoading}
-              >
-                <option value="" disabled>
-                  {departments.isLoading
-                    ? "กำลังโหลดรายชื่อแผนก..."
-                    : "เลือกแผนก/ฝ่าย"}
-                </option>
-                {departments.data?.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.dept_name}
-                  </option>
-                ))}
-              </Select>
+                onChange={(id) => setValue("dept_id", id)}
+                placeholder="เลือกแผนก/ฝ่าย"
+                searchPlaceholder="พิมพ์ชื่อแผนก..."
+                emptyText="ไม่พบแผนกที่ค้นหา"
+                invalid={!!errors.dept_id}
+                disabled={submitting}
+                loading={departments.isLoading}
+              />
             </FormField>
             <FormField
               label="ตำแหน่ง"
