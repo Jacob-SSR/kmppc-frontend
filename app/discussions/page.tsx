@@ -14,6 +14,7 @@ import {
   Search,
   VenetianMask,
 } from "lucide-react";
+import { CategoryFilter } from "@/components/category-filter";
 import { PublicShell } from "@/components/public-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { useCategories, useDiscussions } from "@/lib/queries";
 import { useDebounced } from "@/lib/use-debounce";
 import { formatNum, fullName, timeAgo } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 15;
 
@@ -79,26 +79,20 @@ export default function DiscussionsPage() {
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              { id: "all", category_name: "ทั้งหมด" },
-              ...(categories.data ?? []),
-            ].map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setCategory(c.id);
-                  setPage(1);
-                }}
-                className={cn(
-                  "rounded-full border border-border bg-card px-3.5 py-1.5 text-sm transition-colors hover:bg-secondary",
-                  category === c.id &&
-                    "border-primary bg-primary text-primary-foreground hover:bg-primary",
-                )}
-              >
-                {c.category_name}
-              </button>
-            ))}
+          <div className="mt-4">
+            <CategoryFilter
+              options={(categories.data ?? []).map((c) => ({
+                id: c.id,
+                label: c.category_name,
+                count: c.discussion_count,
+              }))}
+              value={category}
+              onChange={(id) => {
+                setCategory(id);
+                setPage(1);
+              }}
+              loading={categories.isLoading}
+            />
           </div>
         </div>
       </section>
