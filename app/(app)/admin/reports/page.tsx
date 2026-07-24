@@ -47,6 +47,9 @@ export default function AdminReportsPage() {
       toast.success("ลบเนื้อหาแล้ว", "รายงานถูกปิดเป็น \"ดำเนินการแล้ว\"");
       setRemoveTarget(null);
       queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      // ล้าง cache หน้ารายละเอียดทั้งหมด — กันเปิดลิงก์เดิมแล้วเห็นเนื้อหาที่เพิ่งลบ
+      queryClient.removeQueries({ queryKey: ["article"] });
+      queryClient.removeQueries({ queryKey: ["discussion"] });
       queryClient.invalidateQueries({ queryKey: ["articles"] });
       queryClient.invalidateQueries({ queryKey: ["discussions"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });

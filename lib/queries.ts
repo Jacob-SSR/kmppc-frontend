@@ -264,6 +264,9 @@ export function useArticle(slug: string) {
     queryKey: ["article", slug],
     queryFn: async () => (await api.get<Article>(`/articles/${slug}`)).data,
     enabled: !!slug,
+    // เนื้อหาอาจถูกลบโดยเจ้าของ/แอดมินคนอื่นได้ตลอด — refetch ทุกครั้งที่เข้าหน้า
+    // จะได้ไม่เสิร์ฟโพสต์ที่ลบแล้วจาก cache (เช่นกดเข้าจากแจ้งเตือนเก่า)
+    refetchOnMount: "always",
   });
 }
 
@@ -293,6 +296,8 @@ export function useDiscussion(id: string) {
     queryKey: ["discussion", id],
     queryFn: async () => (await api.get<Discussion>(`/discussions/${id}`)).data,
     enabled: !!id,
+    // เหตุผลเดียวกับ useArticle — กันเห็นกระทู้ที่ถูกลบแล้วจาก cache
+    refetchOnMount: "always",
   });
 }
 

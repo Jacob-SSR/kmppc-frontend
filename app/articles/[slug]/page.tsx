@@ -196,6 +196,8 @@ export default function ArticleDetailPage() {
     mutationFn: async () => api.delete(`/articles/${article.data!.id}`),
     onSuccess: () => {
       toast.success("ลบบทความแล้ว");
+      // ล้าง cache หน้ารายละเอียดทิ้ง — กันกดลิงก์เดิม (เช่นจากแจ้งเตือน) แล้วเห็นโพสต์ที่ลบไปแล้ว
+      queryClient.removeQueries({ queryKey: ["article", slug] });
       queryClient.invalidateQueries({ queryKey: ["articles"] });
       queryClient.invalidateQueries({ queryKey: ["my-articles"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });

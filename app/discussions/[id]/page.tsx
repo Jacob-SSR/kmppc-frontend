@@ -206,6 +206,8 @@ export default function DiscussionDetailPage() {
     mutationFn: async () => api.delete(`/discussions/${id}`),
     onSuccess: () => {
       toast.success("ลบกระทู้แล้ว");
+      // ล้าง cache หน้ารายละเอียดทิ้ง — กันกดลิงก์เดิม (เช่นจากแจ้งเตือน) แล้วเห็นกระทู้ที่ลบไปแล้ว
+      queryClient.removeQueries({ queryKey: ["discussion", id] });
       queryClient.invalidateQueries({ queryKey: ["discussions"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       router.push("/discussions");
