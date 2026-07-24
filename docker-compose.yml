@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        # URL ของ backend ที่เครื่องผู้ใช้เข้าถึงได้ — override ได้ด้วยไฟล์ .env
+        # (สร้างไฟล์ .env ข้าง ๆ นี้แล้วใส่ NEXT_PUBLIC_API_URL=http://<ip-server>:3001/api)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://192.168.200.58:3001/api}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
