@@ -3,11 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, ImagePlus, Paperclip, Save, Send, X } from "lucide-react";
+import {
+  Eye,
+  FilePlus2,
+  ImagePlus,
+  Paperclip,
+  Save,
+  Send,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { RichText } from "@/components/rich-text";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
@@ -16,6 +25,7 @@ import { useCategories } from "@/lib/queries";
 import { collectErrors, parseTags, required, runRules } from "@/lib/validation";
 
 const TITLE_MAX = 150;
+const MAX_IMAGES = 10;
 
 type Errors = Partial<Record<"title" | "category_id" | "content", string>>;
 
@@ -34,11 +44,43 @@ export default function NewArticlePage() {
   const [submitting, setSubmitting] = useState<"DRAFT" | "PUBLISHED" | null>(
     null,
   );
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // แทรกข้อความที่ตำแหน่งเคอร์เซอร์ — จัด layout แบบ pantip ได้
+  // (ข้อความ+รูป+ข้อความ+ลิงก์ สลับกันตามที่ผู้เขียนวาง)
+  function insertAtCursor(snippet: string) {
+    const el = contentRef.current;
+    const pos = el?.selectionStart ?? content.length;
+    const before = content.slice(0, pos);
+    const after = content.slice(pos);
+    const block =
+      (before && !before.endsWith("\n") ? "\n" : "") + snippet + "\n";
+    setContent(before + block + after);
+    if (errors.content) setErrors((prev) => ({ ...prev, content: undefined }));
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const p = pos + block.length;
+      el.setSelectionRange(p, p);
+    });
+  }
+
+  const imageCount = (content.match(/!\[/g) ?? []).length;
 
   // รูปหน้าปก — อัปโหลดผ่าน POST /upload แล้วส่ง url ไปกับ cover_image
   const [cover, setCover] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadOne(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await api.post<{ url: string; filename?: string }>(
+      "/upload",
+      formData,
+    );
+    return { url: data.url, filename: data.filename ?? file.name };
+  }
 
   async function handleCover(files: FileList | null) {
     const file = files?.[0];
@@ -53,10 +95,8 @@ export default function NewArticlePage() {
     }
     setUploadingCover(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const { data } = await api.post<{ url: string }>("/upload", formData);
-      setCover(data.url);
+      const { url } = await uploadOne(file);
+      setCover(url);
       toast.success("อัปโหลดรูปหน้าปกแล้ว");
     } catch (err) {
       toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
@@ -66,18 +106,21 @@ export default function NewArticlePage() {
     }
   }
 
-  // รูปประกอบโพสต์ — สูงสุด 10 รูป (ไม่นับปก) ฝังท้ายเนื้อหาเป็น ![ชื่อ](url)
-  const MAX_IMAGES = 10;
-  const [images, setImages] = useState<{ filename: string; url: string }[]>([]);
+  // แทรกรูปในเนื้อหา (สูงสุด MAX_IMAGES รูป ไม่นับปก)
   const [uploadingImages, setUploadingImages] = useState(false);
   const imagesInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleImages(files: FileList | null) {
+  async function handleInsertImages(files: FileList | null) {
     if (!files?.length) return;
     setUploadingImages(true);
     try {
+      let count = imageCount;
+      const snippets: string[] = [];
       for (const file of Array.from(files)) {
-        if (images.length + 1 > MAX_IMAGES) break;
+        if (count >= MAX_IMAGES) {
+          toast.error(`ใส่รูปได้สูงสุด ${MAX_IMAGES} รูป`);
+          break;
+        }
         if (!file.type.startsWith("image/")) {
           toast.error("ไม่ใช่ไฟล์รูปภาพ", file.name);
           continue;
@@ -86,55 +129,42 @@ export default function NewArticlePage() {
           toast.error("รูปใหญ่เกิน 10MB", file.name);
           continue;
         }
-        const formData = new FormData();
-        formData.append("file", file);
-        const { data } = await api.post<{ url: string; filename?: string }>(
-          "/upload",
-          formData,
-        );
-        setImages((prev) =>
-          prev.length >= MAX_IMAGES
-            ? prev
-            : [...prev, { filename: data.filename ?? file.name, url: data.url }],
-        );
+        const { url, filename } = await uploadOne(file);
+        snippets.push(`![${filename}](${url})`);
+        count += 1;
       }
-      toast.success("เพิ่มรูปภาพแล้ว");
+      // แทรกครั้งเดียว — แทรกทีละอันตำแหน่งเคอร์เซอร์จะค้างค่าเก่า
+      if (snippets.length > 0) insertAtCursor(snippets.join("\n"));
     } catch (err) {
-      toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
+      if (isUnauthorizedError(err)) {
+        toast.error("กรุณาเข้าสู่ระบบ", "ต้องเข้าสู่ระบบก่อนจึงจะแนบรูปได้");
+      } else {
+        toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
+      }
     } finally {
       setUploadingImages(false);
       if (imagesInputRef.current) imagesInputRef.current.value = "";
     }
   }
 
-  // ไฟล์แนบ — อัปโหลดผ่าน POST /upload (ทุกนามสกุล ≤10MB) แล้วฝังลิงก์ท้ายเนื้อหา
-  const [attachments, setAttachments] = useState<
-    { filename: string; url: string }[]
-  >([]);
-  const [uploading, setUploading] = useState(false);
+  // แทรกไฟล์แนบในเนื้อหา (ทุกนามสกุล)
+  const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleFiles(files: FileList | null) {
+  async function handleInsertFiles(files: FileList | null) {
     if (!files?.length) return;
-    setUploading(true);
+    setUploadingFile(true);
     try {
+      const snippets: string[] = [];
       for (const file of Array.from(files)) {
         if (file.size > 10 * 1024 * 1024) {
           toast.error("ไฟล์ใหญ่เกิน 10MB", file.name);
           continue;
         }
-        const formData = new FormData();
-        formData.append("file", file);
-        const { data } = await api.post<{ url: string; filename?: string }>(
-          "/upload",
-          formData,
-        );
-        setAttachments((prev) => [
-          ...prev,
-          { filename: data.filename ?? file.name, url: data.url },
-        ]);
+        const { url, filename } = await uploadOne(file);
+        snippets.push(`[📎 ${filename}](${url})`);
       }
-      toast.success("แนบไฟล์แล้ว");
+      if (snippets.length > 0) insertAtCursor(snippets.join("\n"));
     } catch (err) {
       if (isUnauthorizedError(err)) {
         toast.error("กรุณาเข้าสู่ระบบ", "ต้องเข้าสู่ระบบก่อนจึงจะแนบไฟล์ได้");
@@ -142,23 +172,9 @@ export default function NewArticlePage() {
         toast.error("อัปโหลดไฟล์ไม่สำเร็จ", getApiErrorMessage(err));
       }
     } finally {
-      setUploading(false);
+      setUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }
-
-  function contentWithAttachments(): string {
-    let body = content.trim();
-    if (images.length > 0) {
-      body += `\n\n${images.map((i) => `![${i.filename}](${i.url})`).join("\n")}`;
-    }
-    if (attachments.length > 0) {
-      const lines = attachments
-        .map((a) => `[📎 ${a.filename}](${a.url})`)
-        .join("\n");
-      body += `\n\nไฟล์แนบ:\n${lines}`;
-    }
-    return body;
   }
 
   function validate(): boolean {
@@ -180,7 +196,7 @@ export default function NewArticlePage() {
     try {
       await api.post("/articles", {
         title: title.trim(),
-        content: contentWithAttachments(),
+        content: content.trim(),
         category_id: categoryId,
         cover_image: cover ?? undefined,
         excerpt: excerpt.trim() || undefined,
@@ -361,117 +377,20 @@ export default function NewArticlePage() {
             )}
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              รูปประกอบ (สูงสุด {MAX_IMAGES} รูป ไม่นับรูปหน้าปก)
-            </label>
-            <input
-              ref={imagesInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleImages(e.target.files)}
-            />
-            <div className="flex flex-wrap gap-2">
-              {images.map((img) => (
-                <div
-                  key={img.url}
-                  className="relative h-24 w-24 overflow-hidden rounded-lg border border-border"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.url}
-                    alt={img.filename}
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    aria-label="ลบรูป"
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-destructive"
-                    onClick={() =>
-                      setImages((prev) => prev.filter((x) => x.url !== img.url))
-                    }
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              {images.length < MAX_IMAGES && (
-                <button
-                  type="button"
-                  onClick={() => imagesInputRef.current?.click()}
-                  disabled={uploadingImages || !!submitting}
-                  className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
-                >
-                  <ImagePlus className="h-5 w-5" />
-                  {uploadingImages
-                    ? "กำลังอัป..."
-                    : `เพิ่มรูป (${images.length}/${MAX_IMAGES})`}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              ไฟล์แนบ (ทุกนามสกุล ไม่เกิน 10MB ต่อไฟล์)
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              loading={uploading}
-              disabled={!!submitting}
-            >
-              {!uploading && <Paperclip className="h-4 w-4 text-primary" />}
-              {uploading ? "กำลังอัปโหลด..." : "แนบไฟล์"}
-            </Button>
-            {attachments.length > 0 && (
-              <ul className="mt-2 space-y-1.5">
-                {attachments.map((a) => (
-                  <li
-                    key={a.url}
-                    className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm"
-                  >
-                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span className="min-w-0 flex-1 truncate">{a.filename}</span>
-                    <button
-                      type="button"
-                      aria-label="ลบไฟล์แนบ"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() =>
-                        setAttachments((prev) =>
-                          prev.filter((x) => x.url !== a.url),
-                        )
-                      }
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
           <FormField
             label="เนื้อหาบทความ"
             required
             htmlFor="content"
             error={errors.content}
+            hint="วางเคอร์เซอร์ตรงไหนแล้วกด แทรกรูป/แนบไฟล์ — รูปและไฟล์จะแทรกตรงนั้น สลับข้อความ+รูป+ลิงก์ได้ตามต้องการ"
           >
             <Textarea
+              ref={contentRef}
               id="content"
               rows={12}
-              placeholder="เขียนเนื้อหาบทความของคุณที่นี่..."
+              placeholder={
+                "เขียนเนื้อหาบทความของคุณที่นี่...\n\nพิมพ์ข้อความ วางลิงก์ แล้วกดปุ่ม \"แทรกรูป\" ตรงตำแหน่งที่ต้องการ รูปจะแสดงแทรกในเนื้อหาแบบกระทู้ pantip"
+              }
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
@@ -482,7 +401,62 @@ export default function NewArticlePage() {
               className={fieldInvalidClass(errors.content)}
               disabled={!!submitting}
             />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                ref={imagesInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleInsertImages(e.target.files)}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => handleInsertFiles(e.target.files)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imagesInputRef.current?.click()}
+                loading={uploadingImages}
+                disabled={!!submitting || imageCount >= MAX_IMAGES}
+              >
+                {!uploadingImages && (
+                  <ImagePlus className="h-4 w-4 text-primary" />
+                )}
+                {uploadingImages
+                  ? "กำลังอัปโหลด..."
+                  : `แทรกรูป (${imageCount}/${MAX_IMAGES})`}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                loading={uploadingFile}
+                disabled={!!submitting}
+              >
+                {!uploadingFile && <Paperclip className="h-4 w-4 text-primary" />}
+                {uploadingFile ? "กำลังอัปโหลด..." : "แนบไฟล์"}
+              </Button>
+            </div>
           </FormField>
+
+          {content.trim() && (
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <Eye className="h-3.5 w-3.5" />
+                ตัวอย่างการแสดงผล
+              </p>
+              <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                <RichText text={content} />
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
             <Button
