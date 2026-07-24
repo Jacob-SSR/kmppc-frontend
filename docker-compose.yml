@@ -8,4 +8,5 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://192.168.200.58:3001/api}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # ฝั่งเครื่องใช้ 3300 (3000 ถูกโปรเจกต์อื่นใช้แล้ว) → เข้าเว็บที่ http://<ip>:3300
+      - "3300:3000"
