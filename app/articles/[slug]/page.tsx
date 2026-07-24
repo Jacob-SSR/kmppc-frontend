@@ -9,6 +9,7 @@ import {
   Clock,
   Eye,
   Flag,
+  ImagePlus,
   MessageCircle,
   Lock,
   Send,
@@ -16,6 +17,7 @@ import {
   Trash2,
   User,
 } from "lucide-react";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 import { PublicShell } from "@/components/public-shell";
 import { RichText } from "@/components/rich-text";
 import { ShareMenu } from "@/components/share-menu";
@@ -44,6 +46,55 @@ export default function ArticleDetailPage() {
   });
   const [comment, setComment] = useState("");
   const commentBoxRef = useRef<HTMLTextAreaElement>(null);
+
+  // แทรก emoji/รูปที่ตำแหน่งเคอร์เซอร์ในช่องความคิดเห็น
+  function insertIntoComment(snippet: string, blockLevel = false) {
+    const el = commentBoxRef.current;
+    const pos = el?.selectionStart ?? comment.length;
+    const before = comment.slice(0, pos);
+    const after = comment.slice(pos);
+    const text = blockLevel
+      ? `${before && !before.endsWith("\n") ? "\n" : ""}${snippet}\n`
+      : snippet;
+    setComment(before + text + after);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const p = pos + text.length;
+      el.setSelectionRange(p, p);
+    });
+  }
+
+  const [uploadingCommentImage, setUploadingCommentImage] = useState(false);
+  const commentImageRef = useRef<HTMLInputElement>(null);
+
+  async function attachCommentImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("ไม่ใช่ไฟล์รูปภาพ", file.name);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("รูปใหญ่เกิน 10MB", file.name);
+      return;
+    }
+    setUploadingCommentImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post<{ url: string; filename?: string }>(
+        "/upload",
+        formData,
+      );
+      insertIntoComment(`![${data.filename ?? file.name}](${data.url})`, true);
+    } catch (err) {
+      handleAuthError(err, "แนบรูป");
+    } finally {
+      setUploadingCommentImage(false);
+      if (commentImageRef.current) commentImageRef.current.value = "";
+    }
+  }
 
   // ตอบกลับแบบ mention — comment ของบทความเป็นเธรดชั้นเดียว
   function replyToComment(name: string) {
@@ -349,7 +400,35 @@ export default function ArticleDetailPage() {
                   onChange={(e) => setComment(e.target.value)}
                   disabled={commentMutation.isPending}
                 />
-                <div className="mt-2 flex justify-end">
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <EmojiPickerButton
+                      onPick={(emoji) => insertIntoComment(emoji)}
+                      disabled={commentMutation.isPending}
+                    />
+                    <input
+                      ref={commentImageRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => attachCommentImage(e.target.files)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label="แนบรูปภาพ"
+                      title="แนบรูปภาพ"
+                      loading={uploadingCommentImage}
+                      disabled={commentMutation.isPending}
+                      onClick={() => commentImageRef.current?.click()}
+                    >
+                      {!uploadingCommentImage && (
+                        <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                   <Button size="sm" type="submit" loading={commentMutation.isPending}>
                     {!commentMutation.isPending && <Send className="h-4 w-4" />}
                     ส่งความคิดเห็น

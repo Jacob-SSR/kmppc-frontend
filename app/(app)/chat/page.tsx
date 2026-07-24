@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 import { Input } from "@/components/ui/input";
 import { RichText } from "@/components/rich-text";
 import { useToast } from "@/components/ui/toast";
@@ -612,6 +613,10 @@ export default function ChatPage() {
                   <Paperclip className="h-5 w-5 text-muted-foreground" />
                 )}
               </Button>
+              <EmojiPickerButton
+                onPick={(emoji) => setText((t) => t + emoji)}
+                disabled={sendMutation.isPending}
+              />
               <Input
                 placeholder="พิมพ์ข้อความ..."
                 className="flex-1"

@@ -11,6 +11,7 @@ import {
   Clock,
   Eye,
   Flag,
+  ImagePlus,
   MessageCircle,
   Lock,
   Send,
@@ -18,6 +19,7 @@ import {
   Trash2,
   VenetianMask,
 } from "lucide-react";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 import { PublicShell } from "@/components/public-shell";
 import { RichText } from "@/components/rich-text";
 import { ShareMenu } from "@/components/share-menu";
@@ -133,6 +135,55 @@ export default function DiscussionDetailPage() {
     setReplyTo({ id: replyId, name });
     replyBoxRef.current?.focus();
     replyBoxRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  // แทรก emoji/รูปที่ตำแหน่งเคอร์เซอร์ในช่องตอบ
+  function insertIntoReply(snippet: string, blockLevel = false) {
+    const el = replyBoxRef.current;
+    const pos = el?.selectionStart ?? reply.length;
+    const before = reply.slice(0, pos);
+    const after = reply.slice(pos);
+    const text = blockLevel
+      ? `${before && !before.endsWith("\n") ? "\n" : ""}${snippet}\n`
+      : snippet;
+    setReply(before + text + after);
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const p = pos + text.length;
+      el.setSelectionRange(p, p);
+    });
+  }
+
+  const [uploadingReplyImage, setUploadingReplyImage] = useState(false);
+  const replyImageRef = useRef<HTMLInputElement>(null);
+
+  async function attachReplyImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("ไม่ใช่ไฟล์รูปภาพ", file.name);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("รูปใหญ่เกิน 10MB", file.name);
+      return;
+    }
+    setUploadingReplyImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post<{ url: string; filename?: string }>(
+        "/upload",
+        formData,
+      );
+      insertIntoReply(`![${data.filename ?? file.name}](${data.url})`, true);
+    } catch (err) {
+      handleAuthError(err, "แนบรูป");
+    } finally {
+      setUploadingReplyImage(false);
+      if (replyImageRef.current) replyImageRef.current.value = "";
+    }
   }
 
   const deleteMutation = useMutation({
@@ -486,16 +537,44 @@ export default function DiscussionDetailPage() {
               onChange={(e) => setReply(e.target.value)}
               disabled={replyMutation.isPending}
             />
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={anonymous}
-                  onChange={(e) => setAnonymous(e.target.checked)}
-                  className="h-4 w-4 rounded border-input accent-[var(--primary)]"
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5">
+                <EmojiPickerButton
+                  onPick={(emoji) => insertIntoReply(emoji)}
+                  disabled={replyMutation.isPending}
                 />
-                ตอบแบบไม่ระบุตัวตน
-              </label>
+                <input
+                  ref={replyImageRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => attachReplyImage(e.target.files)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="แนบรูปภาพ"
+                  title="แนบรูปภาพ"
+                  loading={uploadingReplyImage}
+                  disabled={replyMutation.isPending}
+                  onClick={() => replyImageRef.current?.click()}
+                >
+                  {!uploadingReplyImage && (
+                    <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+                <label className="ml-1 flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={anonymous}
+                    onChange={(e) => setAnonymous(e.target.checked)}
+                    className="h-4 w-4 rounded border-input accent-[var(--primary)]"
+                  />
+                  ตอบแบบไม่ระบุตัวตน
+                </label>
+              </div>
               <Button type="submit" loading={replyMutation.isPending}>
                 {!replyMutation.isPending && <Send className="h-4 w-4" />}
                 ส่งคำตอบ
