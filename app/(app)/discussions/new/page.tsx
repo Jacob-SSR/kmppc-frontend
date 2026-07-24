@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { RichEditor } from "@/components/rich-editor";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
 import { useCategories } from "@/lib/queries";
@@ -162,19 +162,19 @@ export default function NewDiscussionPage() {
             required
             htmlFor="content"
             error={errors.content}
+            hint="ลากคลุมข้อความแล้วกดปุ่มจัดรูปแบบ / แทรกรูปหน้าจอ error หรือแนบไฟล์ประกอบได้เลย"
           >
-            <Textarea
+            <RichEditor
               id="content"
               rows={8}
-              placeholder="อธิบายอาการของปัญหา จุดที่เกิด และสิ่งที่ลองแก้ไขไปแล้ว..."
+              placeholder="อธิบายอาการของปัญหา จุดที่เกิด และสิ่งที่ลองแก้ไขไปแล้ว... แทรกรูปหน้าจอประกอบได้"
               value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
+              onChange={(next) => {
+                setContent(next);
                 if (errors.content)
                   setErrors((prev) => ({ ...prev, content: undefined }));
               }}
-              aria-invalid={!!errors.content}
-              className={fieldInvalidClass(errors.content)}
+              invalid={!!errors.content}
               disabled={submitting}
             />
           </FormField>
