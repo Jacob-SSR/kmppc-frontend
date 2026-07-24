@@ -190,6 +190,8 @@ export default function ArticleDetailPage() {
     onSuccess: () => {
       toast.success("ลบบทความแล้ว");
       queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["my-articles"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       router.push("/articles");
     },
     onError: (err) => handleAuthError(err, "ลบบทความ"),

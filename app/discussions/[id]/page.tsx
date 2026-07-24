@@ -200,6 +200,7 @@ export default function DiscussionDetailPage() {
     onSuccess: () => {
       toast.success("ลบกระทู้แล้ว");
       queryClient.invalidateQueries({ queryKey: ["discussions"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       router.push("/discussions");
     },
     onError: (err) => handleAuthError(err, "ลบกระทู้"),
