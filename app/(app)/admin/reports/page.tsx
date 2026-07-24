@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Eye, Flag } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Eye, Flag, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useAdminReports, type AdminReport } from "@/lib/queries";
@@ -26,10 +28,31 @@ const typeLabel: Record<string, string> = {
   comment: "ความคิดเห็น",
 };
 
+function reportTargetText(r: AdminReport): string {
+  if (!r.target) return "เนื้อหาถูกลบไปแล้ว";
+  return "title" in r.target ? r.target.title : r.target.excerpt;
+}
+
 export default function AdminReportsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const reports = useAdminReports({ limit: 50 });
+  // รายงานที่กำลังจะลบเนื้อหาเป้าหมาย — ยืนยันผ่าน modal ก่อน
+  const [removeTarget, setRemoveTarget] = useState<AdminReport | null>(null);
+
+  const removeTargetMutation = useMutation({
+    mutationFn: async (reportId: string) =>
+      api.post(`/reports/${reportId}/remove-target`),
+    onSuccess: () => {
+      toast.success("ลบเนื้อหาแล้ว", "รายงานถูกปิดเป็น \"ดำเนินการแล้ว\"");
+      setRemoveTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (err) => toast.error("ลบเนื้อหาไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   const statusMutation = useMutation({
     mutationFn: async ({
@@ -132,10 +155,43 @@ export default function AdminReportsPage() {
                   ปิดรายงาน
                 </Button>
               )}
+              {r.status !== "RESOLVED" && r.target && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/5"
+                  onClick={() => setRemoveTarget(r)}
+                  disabled={removeTargetMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  ลบ{typeLabel[r.target.type] ?? "เนื้อหา"}
+                </Button>
+              )}
             </div>
           </Card>
         );
       })}
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        danger
+        title={`ลบ${
+          removeTarget?.target
+            ? (typeLabel[removeTarget.target.type] ?? "เนื้อหา")
+            : "เนื้อหา"
+        }ที่ถูกรายงาน?`}
+        description={`"${removeTarget ? reportTargetText(removeTarget) : ""}" จะถูกลบ และรายงานนี้จะถูกปิดเป็น "ดำเนินการแล้ว" — การลบย้อนกลับไม่ได้`}
+        confirmLabel={`ลบ${
+          removeTarget?.target
+            ? (typeLabel[removeTarget.target.type] ?? "เนื้อหา")
+            : "เนื้อหา"
+        }`}
+        loading={removeTargetMutation.isPending}
+        onConfirm={() =>
+          removeTarget && removeTargetMutation.mutate(removeTarget.id)
+        }
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   );
 }
