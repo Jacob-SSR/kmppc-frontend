@@ -24,6 +24,7 @@ import {
 
 type FieldName =
   | "display_name"
+  | "position_detail"
   | "fname"
   | "lname"
   | "email"
@@ -46,7 +47,11 @@ const initialValues = {
   confirm_password: "",
   dept_id: "",
   position: "",
+  position_detail: "",
 };
+
+// ตำแหน่งที่ต้องกรอกชื่อสายงานเพิ่ม — บันทึกเป็น "ผู้อำนวยการเฉพาะด้าน(<สายงาน>)"
+const POSITION_NEEDS_DETAIL = "ผู้อำนวยการเฉพาะด้าน(ระบุชื่อสายงาน)";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -88,6 +93,10 @@ export default function RegisterPage() {
       ),
       dept_id: runRules(values.dept_id, required("กรุณาเลือกแผนก/ฝ่าย")),
       position: runRules(values.position, required("กรุณาเลือกตำแหน่ง")),
+      position_detail:
+        values.position === POSITION_NEEDS_DETAIL
+          ? runRules(values.position_detail, required("กรุณาระบุชื่อสายงาน"))
+          : null,
       accept: accept ? null : "กรุณายอมรับเงื่อนไขการใช้งานก่อนสมัครสมาชิก",
     });
     setErrors(nextErrors);
@@ -108,7 +117,10 @@ export default function RegisterPage() {
         username: values.username.trim(),
         password: values.password,
         dept_id: values.dept_id,
-        position: values.position,
+        position:
+          values.position === POSITION_NEEDS_DETAIL
+            ? `ผู้อำนวยการเฉพาะด้าน(${values.position_detail.trim()})`
+            : values.position,
       });
       toast.success(
         "สมัครสมาชิกสำเร็จ",
@@ -345,6 +357,27 @@ export default function RegisterPage() {
               />
             </FormField>
           </div>
+
+          {values.position === POSITION_NEEDS_DETAIL && (
+            <FormField
+              label="ระบุชื่อสายงาน"
+              required
+              htmlFor="position_detail"
+              error={errors.position_detail}
+              hint="จะบันทึกเป็น ผู้อำนวยการเฉพาะด้าน(ชื่อสายงานที่กรอก)"
+            >
+              <Input
+                id="position_detail"
+                name="position_detail"
+                placeholder="เช่น แพทย์, ทันตกรรม, การพยาบาล"
+                value={values.position_detail}
+                onChange={(e) => setValue("position_detail", e.target.value)}
+                aria-invalid={!!errors.position_detail}
+                className={fieldInvalidClass(errors.position_detail)}
+                disabled={submitting}
+              />
+            </FormField>
+          )}
 
           <div>
             <label className="flex items-center gap-2 text-sm">
