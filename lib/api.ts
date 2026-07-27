@@ -40,13 +40,15 @@ export function getApiErrorMessage(
     if (!err.response) {
       return "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่";
     }
+    const message = (err.response.data as { message?: string | string[] })
+      ?.message;
+    const text = Array.isArray(message) ? message[0] : message;
+    // ข้อความภาษาไทยจาก backend (เช่น โควตา AI หมด) สำคัญกว่าข้อความ generic
+    if (text && /[ก-๙]/.test(text)) return text;
     if (err.response.status === 429) {
       return "ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่";
     }
-    const message = (err.response.data as { message?: string | string[] })
-      ?.message;
-    if (Array.isArray(message) && message.length > 0) return message[0];
-    if (typeof message === "string" && message) return message;
+    if (text) return text;
     if (err.response.status === 401) return "กรุณาเข้าสู่ระบบก่อนใช้งาน";
   }
   return fallback;
