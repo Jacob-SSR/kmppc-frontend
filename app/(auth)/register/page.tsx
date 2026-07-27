@@ -9,10 +9,10 @@ import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
-import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useDepartments } from "@/lib/queries";
+import { POSITIONS } from "@/lib/positions";
 import {
   collectErrors,
   email,
@@ -21,23 +21,6 @@ import {
   required,
   runRules,
 } from "@/lib/validation";
-
-const positions = [
-  "แพทย์",
-  "ทันตแพทย์",
-  "เภสัชกร",
-  "พยาบาลวิชาชีพ",
-  "ผู้ช่วยพยาบาล",
-  "นักเทคนิคการแพทย์",
-  "นักรังสีการแพทย์",
-  "นักกายภาพบำบัด",
-  "แพทย์แผนไทย",
-  "นักวิชาการสาธารณสุข",
-  "นักวิชาการคอมพิวเตอร์",
-  "เจ้าพนักงานธุรการ",
-  "เจ้าหน้าที่",
-  "อื่น ๆ",
-];
 
 type FieldName =
   | "display_name"
@@ -349,24 +332,17 @@ export default function RegisterPage() {
               htmlFor="position"
               error={errors.position}
             >
-              <Select
+              <Combobox
                 id="position"
-                name="position"
+                options={POSITIONS.map((p) => ({ value: p, label: p }))}
                 value={values.position}
-                onChange={(e) => setValue("position", e.target.value)}
-                aria-invalid={!!errors.position}
-                className={`h-11 ${fieldInvalidClass(errors.position)}`}
+                onChange={(id) => setValue("position", id)}
+                placeholder="เลือกตำแหน่ง"
+                searchPlaceholder="พิมพ์ชื่อตำแหน่ง..."
+                emptyText="ไม่พบตำแหน่งที่ค้นหา"
+                invalid={!!errors.position}
                 disabled={submitting}
-              >
-                <option value="" disabled>
-                  เลือกตำแหน่ง
-                </option>
-                {positions.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </Select>
+              />
             </FormField>
           </div>
 
