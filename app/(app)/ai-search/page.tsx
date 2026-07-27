@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   BookOpen,
@@ -51,8 +52,18 @@ const sourceMeta: Record<string, { label: string; icon: typeof FileText }> = {
 };
 
 export default function AiSearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <AiSearchContent />
+    </Suspense>
+  );
+}
+
+function AiSearchContent() {
   const toast = useToast();
-  const [query, setQuery] = useState("");
+  // คำถามที่ส่งมาจากการ์ดหน้าแรก (?q=...) — ถามให้เลยไม่ต้องพิมพ์ซ้ำ
+  const initialQ = useSearchParams().get("q")?.trim() ?? "";
+  const [query, setQuery] = useState(initialQ);
   // คำถามที่ส่งไปแล้วของคำตอบปัจจุบัน — ใช้โชว์หัวคำตอบ + ปุ่มค้นเว็บ
   const [askedQuery, setAskedQuery] = useState("");
   const [result, setResult] = useState<AiAnswer | null>(null);
@@ -100,6 +111,15 @@ export default function AiSearchPage() {
   });
 
   const loading = askMutation.isPending || webMutation.isPending;
+
+  // มี ?q= ติดมา → ยิงถามอัตโนมัติครั้งเดียวตอนเข้าหน้า
+  const autoAskedRef = useRef(false);
+  useEffect(() => {
+    if (!initialQ || autoAskedRef.current) return;
+    autoAskedRef.current = true;
+    askMutation.mutate(initialQ);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQ]);
 
   function ask(q: string) {
     const trimmed = q.trim();

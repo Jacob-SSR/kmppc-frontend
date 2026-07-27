@@ -75,6 +75,15 @@ function ListSkeleton({ rows }: { rows: number }) {
 export default function Home() {
   const router = useRouter();
   const [q, setQ] = useState("");
+  // คำถามในการ์ด AI Search — ส่งต่อไปหน้า /ai-search ผ่าน ?q= จะได้ไม่ต้องพิมพ์ซ้ำ
+  const [aiQuery, setAiQuery] = useState("");
+
+  function goAskAi() {
+    const trimmed = aiQuery.trim();
+    router.push(
+      trimmed ? `/ai-search?q=${encodeURIComponent(trimmed)}` : "/ai-search",
+    );
+  }
   const categories = useCategories();
   const tags = useTags();
   const latestArticles = useArticles({ limit: 4 });
@@ -347,15 +356,27 @@ export default function Home() {
             ถามคำถาม แล้ว AI จะหาคำตอบให้คุณจากฐานความรู้
           </p>
           <textarea
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter = ถามเลย (Shift+Enter ขึ้นบรรทัดใหม่)
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                goAskAi();
+              }
+            }}
             placeholder="เช่น วิธีแก้ไขปัญหา Printer ไม่พิมพ์, วิธี Backup HOSxP..."
             className="mt-4 h-28 w-full resize-none rounded-lg border border-input bg-card p-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
-          <Link href="/ai-search" className="mt-4">
-            <Button variant="ai" size="lg" className="w-full">
-              <Sparkles className="h-4 w-4" />
-              ถาม AI เลย
-            </Button>
-          </Link>
+          <Button
+            variant="ai"
+            size="lg"
+            className="mt-4 w-full"
+            onClick={goAskAi}
+          >
+            <Sparkles className="h-4 w-4" />
+            ถาม AI เลย
+          </Button>
           <p className="mt-4 text-xs text-muted-foreground">
             ใช้เทคโนโลยี AI เพื่อค้นหาคำตอบที่แม่นยำจากเอกสารและประสบการณ์
           </p>
