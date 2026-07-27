@@ -72,6 +72,11 @@ function AiSearchContent() {
   const [isWebResult, setIsWebResult] = useState(false);
   // feedback ที่ส่งไปแล้วของ log ปัจจุบัน (true=มีประโยชน์)
   const [feedbackSent, setFeedbackSent] = useState<boolean | null>(null);
+  // สถานะ streaming (SSE) — ต้องประกาศก่อน loading ด้านล่าง
+  const [streaming, setStreaming] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
+  useEffect(() => () => esRef.current?.close(), []);
+  const queryClient = useQueryClient();
 
   const askMutation = useMutation({
     mutationFn: async (q: string) =>
@@ -115,8 +120,7 @@ function AiSearchContent() {
       toast.error("ส่ง feedback ไม่สำเร็จ", getApiErrorMessage(err)),
   });
 
-  const loading = askMutation.isPending || webMutation.isPending;
-  const queryClient = useQueryClient();
+  const loading = askMutation.isPending || webMutation.isPending || streaming;
 
   // ประวัติคำถามของฉัน — refresh หลังถามเสร็จแต่ละครั้ง
   const historyQuery = useQuery({
@@ -134,9 +138,79 @@ function AiSearchContent() {
   useEffect(() => {
     if (!initialQ || autoAskedRef.current) return;
     autoAskedRef.current = true;
-    askMutation.mutate(initialQ);
+    askStream(initialQ);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQ]);
+
+  // ---------- ถามแบบ streaming (SSE) — คำตอบไหลทีละส่วนเหมือนพิมพ์สด ----------
+  function parseSse(raw: string): unknown {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw; // chunk เป็น string ดิบ ไม่ใช่ JSON
+    }
+  }
+
+  function askStream(q: string) {
+    esRef.current?.close();
+    setAskedQuery(q);
+    setResult(null);
+    setIsWebResult(false);
+    setFeedbackSent(null);
+    setStreaming(true);
+    let gotAnything = false;
+    const base =
+      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+    const es = new EventSource(
+      `${base}/ai-search/stream?q=${encodeURIComponent(q)}`,
+      { withCredentials: true },
+    );
+    esRef.current = es;
+    es.addEventListener("sources", (e) => {
+      gotAnything = true;
+      const sources = parseSse((e as MessageEvent).data) as AiSource[];
+      setResult((prev) => ({
+        found: true,
+        answer: prev?.answer ?? "",
+        sources: Array.isArray(sources) ? sources : [],
+        log_id: prev?.log_id,
+      }));
+    });
+    es.addEventListener("chunk", (e) => {
+      gotAnything = true;
+      const piece = parseSse((e as MessageEvent).data);
+      const text = typeof piece === "string" ? piece : String(piece ?? "");
+      setResult((prev) => ({
+        found: prev?.found ?? true,
+        answer: (prev?.answer ?? "") + text,
+        sources: prev?.sources ?? [],
+        log_id: prev?.log_id,
+      }));
+    });
+    es.addEventListener("done", (e) => {
+      const d = parseSse((e as MessageEvent).data) as {
+        found?: boolean;
+        log_id?: string;
+        message?: string;
+      };
+      setResult((prev) => ({
+        found: d?.found ?? true,
+        answer: prev?.answer ?? d?.message ?? "",
+        sources: prev?.sources ?? [],
+        log_id: d?.log_id,
+      }));
+      setStreaming(false);
+      es.close();
+      queryClient.invalidateQueries({ queryKey: ["ai-history"] });
+    });
+    es.onerror = () => {
+      es.close();
+      setStreaming(false);
+      // SSE ใช้ไม่ได้ (proxy/เน็ตบางแบบ) → ถอยไปแบบตอบทีเดียวตามเดิม
+      if (!gotAnything) askMutation.mutate(q);
+      else toast.error("การเชื่อมต่อหลุดระหว่างรับคำตอบ", "ลองถามใหม่อีกครั้ง");
+    };
+  }
 
   function ask(q: string) {
     const trimmed = q.trim();
@@ -146,7 +220,7 @@ function AiSearchContent() {
     }
     if (loading) return;
     setQuery(trimmed);
-    askMutation.mutate(trimmed);
+    askStream(trimmed);
   }
 
   return (
@@ -183,7 +257,7 @@ function AiSearchContent() {
       </form>
 
       {/* กำลังคิด */}
-      {loading && (
+      {loading && !result && (
         <Card className="mt-6 p-6">
           <div className="flex items-center gap-3">
             <span className="flex h-8 w-8 animate-pulse items-center justify-center rounded-lg bg-ai text-ai-foreground">
@@ -209,7 +283,7 @@ function AiSearchContent() {
       )}
 
       {/* คำตอบ */}
-      {!loading && result && (
+      {result && (
         <Card className="mt-6 p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-bold">
@@ -229,6 +303,9 @@ function AiSearchContent() {
 
           <div className="mt-4 space-y-3 whitespace-pre-wrap text-sm leading-relaxed">
             <RichText text={result.answer} />
+            {streaming && (
+              <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-ai align-middle" />
+            )}
           </div>
 
           {/* ไม่พบในฐานความรู้ → เสนอค้นเว็บ */}

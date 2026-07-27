@@ -2,13 +2,15 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { ImagePlus, PencilLine, Save, Send, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { History, ImagePlus, PencilLine, Save, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { RichEditor } from "@/components/rich-editor";
+import { RichText } from "@/components/rich-text";
+import { timeAgo } from "@/lib/format";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
@@ -61,11 +63,39 @@ export default function EditArticlePage() {
   return <EditArticleForm article={article.data} />;
 }
 
+type ArticleVersion = {
+  id: string;
+  version_no: number;
+  content: string;
+  edited_at: string;
+  editor: {
+    fname: string;
+    lname: string | null;
+    display_name?: string | null;
+  };
+};
+
 // แยก component เพื่อ init state จากข้อมูลบทความได้ตรง ๆ (เลี่ยง setState ใน effect)
 function EditArticleForm({ article }: { article: Article }) {
   const router = useRouter();
   const toast = useToast();
   const queryClient = useQueryClient();
+
+  // ประวัติเวอร์ชันเนื้อหา — โหลดเมื่อกดเปิดเท่านั้น
+  const [showHistory, setShowHistory] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<ArticleVersion | null>(
+    null,
+  );
+  const versions = useQuery({
+    queryKey: ["article-versions", article.id],
+    queryFn: async () =>
+      (
+        await api.get<{ title: string; versions: ArticleVersion[] }>(
+          `/articles/${article.id}/versions`,
+        )
+      ).data,
+    enabled: showHistory,
+  });
   const categories = useCategories();
   const [title, setTitle] = useState(article.title);
   const [categoryId, setCategoryId] = useState(article.category.id);
@@ -162,13 +192,93 @@ function EditArticleForm({ article }: { article: Article }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 lg:px-6">
-      <h1 className="flex items-center gap-2 text-2xl font-bold">
-        <PencilLine className="h-6 w-6 text-primary" />
-        แก้ไขบทความ
-      </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {isDraft ? "ฉบับร่าง — ยังไม่เผยแพร่ให้คนอื่นเห็น" : article.title}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <PencilLine className="h-6 w-6 text-primary" />
+            แก้ไขบทความ
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isDraft ? "ฉบับร่าง — ยังไม่เผยแพร่ให้คนอื่นเห็น" : article.title}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowHistory((v) => !v)}
+        >
+          <History className="h-4 w-4 text-primary" />
+          ประวัติการแก้ไข
+        </Button>
+      </div>
+
+      {/* ประวัติเวอร์ชันเนื้อหา — เก็บอัตโนมัติทุกครั้งที่แก้ไข */}
+      {showHistory && (
+        <Card className="mt-4 p-5">
+          <h2 className="text-sm font-bold">ประวัติเวอร์ชันเนื้อหา</h2>
+          {versions.isLoading && (
+            <p className="mt-3 text-sm text-muted-foreground">กำลังโหลด...</p>
+          )}
+          {!versions.isLoading &&
+            (versions.data?.versions.length ?? 0) === 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                ยังไม่มีประวัติ — ระบบจะเก็บเนื้อหาเวอร์ชันเก่าให้อัตโนมัติทุกครั้งที่บันทึกการแก้ไข
+              </p>
+            )}
+          <div className="mt-3 space-y-2">
+            {versions.data?.versions.map((v) => (
+              <div
+                key={v.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm"
+              >
+                <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-primary-dark">
+                  v{v.version_no}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  แก้โดย{" "}
+                  {v.editor.display_name?.trim() ||
+                    `${v.editor.fname} ${v.editor.lname ?? ""}`}{" "}
+                  · {timeAgo(v.edited_at)}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={() =>
+                    setPreviewVersion(
+                      previewVersion?.id === v.id ? null : v,
+                    )
+                  }
+                >
+                  {previewVersion?.id === v.id ? "ซ่อน" : "ดูเนื้อหา"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setContent(v.content);
+                    toast.success(
+                      `นำเนื้อหา v${v.version_no} กลับมาแล้ว`,
+                      "ตรวจดูในช่องเนื้อหา แล้วกดบันทึกเพื่อยืนยัน",
+                    );
+                  }}
+                >
+                  กู้คืนเวอร์ชันนี้
+                </Button>
+                {previewVersion?.id === v.id && (
+                  <div className="w-full whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm leading-relaxed">
+                    <RichText text={v.content} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="mt-6 p-6">
         <form
