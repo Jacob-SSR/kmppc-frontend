@@ -35,6 +35,7 @@ import {
 } from "@/lib/queries";
 import { useDebounced } from "@/lib/use-debounce";
 import { useRealtimeStore } from "@/lib/store";
+import { copyText } from "@/lib/clipboard";
 import { fullName, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -172,11 +173,12 @@ function ChatContent() {
     }
   }
 
-  function copyMyCode() {
-    navigator.clipboard
-      .writeText(myCode)
-      .then(() => toast.success("คัดลอกรหัสเพื่อนแล้ว", "ส่งให้เพื่อนไปแอดได้เลย"))
-      .catch(() => toast.error("คัดลอกไม่สำเร็จ"));
+  async function copyMyCode() {
+    if (await copyText(myCode)) {
+      toast.success("คัดลอกรหัสเพื่อนแล้ว", "ส่งให้เพื่อนไปแอดได้เลย");
+    } else {
+      toast.error("คัดลอกไม่สำเร็จ", `รหัสของคุณคือ ${myCode} (จดส่งเองได้)`);
+    }
   }
 
   // ---------- ระบบเพื่อน ----------

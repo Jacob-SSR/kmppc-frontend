@@ -13,6 +13,7 @@ function FacebookIcon({ className }: { className?: string }) {
 }
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { copyText } from "@/lib/clipboard";
 
 /** ปุ่มแชร์แบบเมนู — Facebook / LINE / Telegram / คัดลอกลิงก์ */
 export function ShareMenu({ title }: { title: string }) {
@@ -43,10 +44,9 @@ export function ShareMenu({ title }: { title: string }) {
   }
 
   async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(pageUrl());
+    if (await copyText(pageUrl())) {
       toast.success("คัดลอกลิงก์แล้ว", "ส่งต่อให้เพื่อนร่วมงานได้เลย");
-    } catch {
+    } else {
       toast.error("คัดลอกลิงก์ไม่สำเร็จ");
     }
     setOpen(false);
