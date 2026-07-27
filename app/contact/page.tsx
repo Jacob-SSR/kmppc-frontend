@@ -16,12 +16,12 @@ const channels = [
   {
     icon: Phone,
     title: "โทรศัพท์ภายใน",
-    lines: ["แผนก IT: ต่อ 1234", "แจ้งปัญหาเร่งด่วน: ต่อ 1235"],
+    lines: ["แผนก IT: 306"],
   },
   {
     icon: Mail,
     title: "อีเมล",
-    lines: ["it-support@phlapphlachai-hospital.go.th"],
+    lines: ["kmppch@gmail.com"],
   },
   {
     icon: MapPin,
@@ -31,7 +31,7 @@ const channels = [
   {
     icon: Clock,
     title: "เวลาทำการ",
-    lines: ["จันทร์ - ศุกร์ 08:30 - 16:30 น.", "นอกเวลา: โทรเวรฉุกเฉิน IT"],
+    lines: ["จันทร์ - ศุกร์ 08:30 - 16:30 น."],
   },
 ];
 

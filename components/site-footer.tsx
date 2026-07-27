@@ -21,7 +21,7 @@ export function SiteFooter() {
               ระบบจัดการองค์ความรู้ (Knowledge Management System)
             </p>
             <p className="text-xs text-white/70">
-              © 2024 โรงพยาบาลพลับพลาชัย สงวนลิขสิทธิ์
+              © {new Date().getFullYear()} โรงพยาบาลพลับพลาชัย สงวนลิขสิทธิ์
             </p>
           </div>
         </div>
