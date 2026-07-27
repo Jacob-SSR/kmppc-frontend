@@ -2,26 +2,66 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheck,
   Building2,
   CalendarDays,
+  Check,
   FileText,
   MessageCircle,
   MessagesSquare,
+  UserMinus,
+  UserPlus,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useMe, useUserProfile } from "@/lib/queries";
+import { useToast } from "@/components/ui/toast";
+import { api, getApiErrorMessage } from "@/lib/api";
+import { useFriends, useMe, useUserProfile } from "@/lib/queries";
 import { realName, timeAgo } from "@/lib/format";
 
 /** โปรไฟล์สาธารณะของสมาชิก — แสดงชื่อจริงสไตล์เฟซบุ๊ก + ปุ่มเริ่มแชท */
 export default function UserProfilePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const me = useMe();
   const profile = useUserProfile(id);
+  const friends = useFriends();
+
+  const refreshFriends = () =>
+    queryClient.invalidateQueries({ queryKey: ["friends"] });
+
+  const addFriendMutation = useMutation({
+    mutationFn: async () => api.post(`/friends/${id}`),
+    onSuccess: () => {
+      toast.success("ส่งคำขอเป็นเพื่อนแล้ว", "รออีกฝ่ายตอบรับ");
+      refreshFriends();
+    },
+    onError: (err) =>
+      toast.error("ส่งคำขอไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const acceptMutation = useMutation({
+    mutationFn: async (friendshipId: string) =>
+      api.post(`/friends/${friendshipId}/accept`),
+    onSuccess: () => {
+      toast.success("เป็นเพื่อนกันแล้ว 🎉");
+      refreshFriends();
+    },
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const removeMutation = useMutation({
+    mutationFn: async (friendshipId: string) =>
+      api.delete(`/friends/${friendshipId}`),
+    onSuccess: () => {
+      toast.success("ลบรายการเพื่อนแล้ว");
+      refreshFriends();
+    },
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   if (profile.isLoading) {
     return (
@@ -92,14 +132,77 @@ export default function UserProfilePage() {
           </div>
 
           {!isMe && (
-            <Button
-              variant="dark"
-              className="mt-6"
-              onClick={() => router.push(`/chat?user=${p.id}`)}
-            >
-              <MessageCircle className="h-4 w-4" />
-              ส่งข้อความ
-            </Button>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <Button
+                variant="dark"
+                onClick={() => router.push(`/chat?user=${p.id}`)}
+              >
+                <MessageCircle className="h-4 w-4" />
+                ส่งข้อความ
+              </Button>
+              {(() => {
+                const data = friends.data;
+                if (!data) return null;
+                const asFriend = data.friends.find((f) => f.user.id === p.id);
+                const asIncoming = data.incoming.find(
+                  (f) => f.user.id === p.id,
+                );
+                const asOutgoing = data.outgoing.find(
+                  (f) => f.user.id === p.id,
+                );
+                if (asFriend)
+                  return (
+                    <Button
+                      variant="outline"
+                      loading={removeMutation.isPending}
+                      onClick={() =>
+                        removeMutation.mutate(asFriend.friendship_id)
+                      }
+                      title="เลิกเป็นเพื่อน"
+                    >
+                      <Check className="h-4 w-4 text-primary" />
+                      เพื่อนกันแล้ว
+                    </Button>
+                  );
+                if (asIncoming)
+                  return (
+                    <Button
+                      variant="ai"
+                      loading={acceptMutation.isPending}
+                      onClick={() =>
+                        acceptMutation.mutate(asIncoming.friendship_id)
+                      }
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      ตอบรับคำขอเป็นเพื่อน
+                    </Button>
+                  );
+                if (asOutgoing)
+                  return (
+                    <Button
+                      variant="outline"
+                      loading={removeMutation.isPending}
+                      onClick={() =>
+                        removeMutation.mutate(asOutgoing.friendship_id)
+                      }
+                      title="ยกเลิกคำขอ"
+                    >
+                      <UserMinus className="h-4 w-4" />
+                      รอตอบรับ · ยกเลิก
+                    </Button>
+                  );
+                return (
+                  <Button
+                    variant="outline"
+                    loading={addFriendMutation.isPending}
+                    onClick={() => addFriendMutation.mutate()}
+                  >
+                    <UserPlus className="h-4 w-4 text-primary" />
+                    เพิ่มเพื่อน
+                  </Button>
+                );
+              })()}
+            </div>
           )}
           {isMe && (
             <Link href="/profile" className="mt-6 inline-block">

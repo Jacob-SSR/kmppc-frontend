@@ -29,10 +29,12 @@ import {
   useChatMessages,
   useConversations,
   useDirectory,
+  useFriends,
   useMe,
   type Conversation,
 } from "@/lib/queries";
 import { useDebounced } from "@/lib/use-debounce";
+import { useRealtimeStore } from "@/lib/store";
 import { fullName, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +66,8 @@ function ChatContent() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // ---------- Socket.IO realtime ----------
-  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  // online ids อยู่ใน Zustand store กลาง (layout เป็นคน subscribe ให้แล้ว)
+  const onlineIds = useRealtimeStore((s) => s.onlineIds);
 
   useEffect(() => {
     const socket = getChatSocket();
@@ -75,12 +78,9 @@ function ChatContent() {
       });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     };
-    const onOnline = (ids: string[]) => setOnlineIds(new Set(ids));
     socket.on("message:new", onNewMessage);
-    socket.on("users:online", onOnline);
     return () => {
       socket.off("message:new", onNewMessage);
-      socket.off("users:online", onOnline);
     };
   }, [queryClient]);
 
@@ -179,6 +179,72 @@ function ChatContent() {
       .catch(() => toast.error("คัดลอกไม่สำเร็จ"));
   }
 
+  // ---------- ระบบเพื่อน ----------
+  const friendsQuery = useFriends();
+  const refreshFriends = () =>
+    queryClient.invalidateQueries({ queryKey: ["friends"] });
+  const acceptFriendMutation = useMutation({
+    mutationFn: async (friendshipId: string) =>
+      api.post(`/friends/${friendshipId}/accept`),
+    onSuccess: () => {
+      toast.success("เป็นเพื่อนกันแล้ว 🎉");
+      refreshFriends();
+    },
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const declineFriendMutation = useMutation({
+    mutationFn: async (friendshipId: string) =>
+      api.delete(`/friends/${friendshipId}`),
+    onSuccess: refreshFriends,
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
+  // ---------- จัดการสมาชิกกลุ่ม ----------
+  const [showMembers, setShowMembers] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [addMemberQuery, setAddMemberQuery] = useState("");
+  const debouncedAddMemberQuery = useDebounced(addMemberQuery);
+  const addMemberDirectory = useDirectory(
+    debouncedAddMemberQuery,
+    showMembers && debouncedAddMemberQuery.trim().length > 0,
+  );
+
+  const addMemberMutation = useMutation({
+    mutationFn: async (userId: string) =>
+      api.post(`/chat/conversations/${activeId}/members`, {
+        member_ids: [userId],
+      }),
+    onSuccess: () => {
+      toast.success("เพิ่มสมาชิกเข้ากลุ่มแล้ว");
+      setAddMemberQuery("");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) =>
+      toast.error("เพิ่มสมาชิกไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const removeMemberMutation = useMutation({
+    mutationFn: async (userId: string) =>
+      api.delete(`/chat/conversations/${activeId}/members/${userId}`),
+    onSuccess: () => {
+      toast.success("ถอดสมาชิกออกจากกลุ่มแล้ว");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) =>
+      toast.error("ถอดสมาชิกไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const leaveMutation = useMutation({
+    mutationFn: async () => api.post(`/chat/conversations/${activeId}/leave`),
+    onSuccess: () => {
+      toast.success("ออกจากกลุ่มแล้ว");
+      setConfirmLeave(false);
+      setShowMembers(false);
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) =>
+      toast.error("ออกจากกลุ่มไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
   function toggleMember(id: string, name: string) {
     setSelectedMembers((prev) =>
       prev.some((m) => m.id === id)
@@ -211,6 +277,9 @@ function ChatContent() {
         .includes(search.trim().toLowerCase()),
   );
   const active = conversations.data?.find((c) => c.id === activeId) ?? null;
+  const amGroupAdmin = !!active?.members.some(
+    (m) => m.user.id === me.data?.id && m.is_admin,
+  );
 
   // เลื่อนลงล่างสุดเมื่อข้อความเปลี่ยน
   const messageCount = messages.data?.items.length ?? 0;
@@ -487,9 +556,93 @@ function ChatContent() {
           </div>
         </div>
 
+        {/* คำขอเป็นเพื่อนที่รอตอบรับ */}
+        {!newChatMode && (friendsQuery.data?.incoming.length ?? 0) > 0 && (
+          <div className="border-b border-border bg-secondary/40 p-3">
+            <p className="mb-2 text-xs font-bold text-primary-dark">
+              👋 คำขอเป็นเพื่อน ({friendsQuery.data!.incoming.length})
+            </p>
+            <div className="space-y-2">
+              {friendsQuery.data!.incoming.map((f) => (
+                <div key={f.friendship_id} className="flex items-center gap-2">
+                  <Avatar
+                    name={fullName(f.user)}
+                    src={f.user.profile_image}
+                    size="sm"
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {fullName(f.user)}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    loading={acceptFriendMutation.isPending}
+                    onClick={() =>
+                      acceptFriendMutation.mutate(f.friendship_id)
+                    }
+                  >
+                    ตอบรับ
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="ปฏิเสธ"
+                    onClick={() =>
+                      declineFriendMutation.mutate(f.friendship_id)
+                    }
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {newChatMode ? (
           <>
             <div className="flex-1 overflow-y-auto">
+              {/* เพื่อนของฉัน — โชว์ก่อนเมื่อยังไม่ได้พิมพ์ค้นหา */}
+              {!groupMode &&
+                !userQuery.trim() &&
+                (friendsQuery.data?.friends.length ?? 0) > 0 && (
+                  <div className="border-b border-border/60 pb-1">
+                    <p className="px-3.5 pb-1 pt-3 text-xs font-bold text-muted-foreground">
+                      เพื่อนของฉัน ({friendsQuery.data!.friends.length})
+                    </p>
+                    {friendsQuery.data!.friends.map((f) => (
+                      <button
+                        key={f.friendship_id}
+                        onClick={() =>
+                          startChatMutation.mutate({
+                            type: "DIRECT",
+                            member_ids: [f.user.id],
+                          })
+                        }
+                        disabled={startChatMutation.isPending}
+                        className="flex w-full items-center gap-3 p-3.5 py-2 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                      >
+                        <div className="relative">
+                          <Avatar
+                            name={fullName(f.user)}
+                            src={f.user.profile_image}
+                          />
+                          {isOnline(f.user.id) && (
+                            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {fullName(f.user)}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {f.user.department?.dept_name}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               {directory.isLoading && (
                 <p className="p-4 text-sm text-muted-foreground">
                   กำลังค้นหา...
@@ -664,11 +817,11 @@ function ChatContent() {
                   )}
                 </div>
               )}
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold">
                   {conversationName(active, me.data?.id)}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="truncate text-xs text-muted-foreground">
                   {active.type === "GROUP"
                     ? `สมาชิก ${active.members.length} คน — ${active.members
                         .map((m) => m.user.fname)
@@ -678,7 +831,118 @@ function ChatContent() {
                       : "ออฟไลน์"}
                 </p>
               </div>
+              {active.type === "GROUP" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="จัดการสมาชิกกลุ่ม"
+                  title="สมาชิกกลุ่ม"
+                  onClick={() => setShowMembers((v) => !v)}
+                >
+                  <Users className="h-5 w-5 text-primary" />
+                </Button>
+              )}
             </header>
+
+            {/* แผงจัดการสมาชิกกลุ่ม */}
+            {active.type === "GROUP" && showMembers && (
+              <div className="border-b border-border bg-card px-5 py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold">
+                    สมาชิกกลุ่ม ({active.members.length})
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/5"
+                    loading={leaveMutation.isPending}
+                    onClick={() => setConfirmLeave(true)}
+                  >
+                    ออกจากกลุ่ม
+                  </Button>
+                </div>
+                <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                  {active.members.map((m) => (
+                    <div
+                      key={m.user.id}
+                      className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted"
+                    >
+                      <Avatar
+                        name={fullName(m.user)}
+                        src={m.user.profile_image}
+                        size="sm"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {fullName(m.user)}
+                        {m.user.id === me.data?.id && " (คุณ)"}
+                      </span>
+                      {m.is_admin && (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-primary-dark">
+                          แอดมิน
+                        </span>
+                      )}
+                      {amGroupAdmin && m.user.id !== me.data?.id && (
+                        <button
+                          type="button"
+                          aria-label="ถอดออกจากกลุ่ม"
+                          title="ถอดออกจากกลุ่ม"
+                          onClick={() =>
+                            removeMemberMutation.mutate(m.user.id)
+                          }
+                          className="text-muted-foreground transition-colors hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {amGroupAdmin && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                      เพิ่มสมาชิกใหม่
+                    </p>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="พิมพ์ชื่อเพื่อนร่วมงาน..."
+                        className="h-8 pl-8 text-sm"
+                        value={addMemberQuery}
+                        onChange={(e) => setAddMemberQuery(e.target.value)}
+                      />
+                    </div>
+                    {addMemberQuery.trim() && (
+                      <div className="mt-1.5 max-h-36 space-y-0.5 overflow-y-auto">
+                        {(addMemberDirectory.data ?? [])
+                          .filter(
+                            (u) =>
+                              !active.members.some((m) => m.user.id === u.id),
+                          )
+                          .map((u) => (
+                            <button
+                              key={u.id}
+                              type="button"
+                              onClick={() => addMemberMutation.mutate(u.id)}
+                              disabled={addMemberMutation.isPending}
+                              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-60"
+                            >
+                              <Avatar
+                                name={fullName(u)}
+                                src={u.profile_image}
+                                size="sm"
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {fullName(u)}
+                              </span>
+                              <MessageCirclePlus className="h-4 w-4 shrink-0 text-primary" />
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex-1 space-y-3 overflow-y-auto bg-background p-5">
               {messages.isLoading && (
@@ -834,6 +1098,17 @@ function ChatContent() {
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={confirmLeave}
+        danger
+        title="ออกจากกลุ่มนี้?"
+        description="คุณจะไม่เห็นข้อความในกลุ่มนี้อีก จนกว่าแอดมินกลุ่มจะเพิ่มคุณกลับเข้ามาใหม่"
+        confirmLabel="ออกจากกลุ่ม"
+        loading={leaveMutation.isPending}
+        onConfirm={() => leaveMutation.mutate()}
+        onCancel={() => setConfirmLeave(false)}
+      />
 
       <ConfirmDialog
         open={!!deleteMsgId}

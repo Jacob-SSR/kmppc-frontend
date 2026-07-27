@@ -13,6 +13,7 @@ import {
   Tags,
   Users,
 } from "lucide-react";
+import { useMe } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 const adminTabs = [
@@ -32,6 +33,27 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const me = useMe();
+
+  // กันคนไม่ใช่ ADMIN เข้าโซนนี้ตั้งแต่ฝั่ง frontend (backend มี 403 อีกชั้นอยู่แล้ว)
+  if (me.data && me.data.role.role_name !== "ADMIN") {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20 text-center">
+        <ShieldCheck className="mx-auto h-10 w-10 text-muted-foreground" />
+        <h1 className="mt-4 text-xl font-bold">เฉพาะผู้ดูแลระบบเท่านั้น</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลระบบ —
+          หากคิดว่านี่เป็นความผิดพลาด กรุณาติดต่อผู้ดูแล
+        </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-block text-sm text-primary hover:underline"
+        >
+          ← กลับหน้าหลัก
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">

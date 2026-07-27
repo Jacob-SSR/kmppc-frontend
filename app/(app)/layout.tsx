@@ -15,8 +15,12 @@ import {
   Sparkles,
   User,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useToast } from "@/components/ui/toast";
+import { getChatSocket } from "@/lib/socket";
+import { useRealtimeStore } from "@/lib/store";
 import { useMe, useNotifications } from "@/lib/queries";
 import { initial } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -49,6 +53,29 @@ export default function AppLayout({
   useEffect(() => {
     if (me.isError) router.replace("/login");
   }, [me.isError, router]);
+
+  // socket กลางของโซนสมาชิก: แจ้งเตือน realtime + รายชื่อคนออนไลน์ (Zustand)
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const setOnlineIds = useRealtimeStore((s) => s.setOnlineIds);
+  useEffect(() => {
+    if (!me.data) return;
+    const socket = getChatSocket();
+    socket.connect();
+    const onNotification = (n: { title?: string; message?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      if (n.title) {
+        toast.info(n.title, n.message?.split("\n")[0]);
+      }
+    };
+    const onOnline = (ids: string[]) => setOnlineIds(ids);
+    socket.on("notification:new", onNotification);
+    socket.on("users:online", onOnline);
+    return () => {
+      socket.off("notification:new", onNotification);
+      socket.off("users:online", onOnline);
+    };
+  }, [me.data, queryClient, toast, setOnlineIds]);
 
   return (
     <div className="flex min-h-screen flex-col">

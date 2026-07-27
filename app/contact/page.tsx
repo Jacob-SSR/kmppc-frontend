@@ -9,6 +9,7 @@ import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { collectErrors, minLength, required, runRules } from "@/lib/validation";
 
 const channels = [
@@ -44,8 +45,8 @@ export default function ContactPage() {
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  // ยังไม่มี endpoint รับข้อความติดต่อฝั่ง backend — validate และตอบรับฝั่ง client ไปก่อน
-  function handleSubmit(e: React.FormEvent) {
+  // ส่งเข้าระบบจริง — POST /contact แจ้งเตือนถึงผู้ดูแลระบบทันที
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const nextErrors = collectErrors({
       name: runRules(name, required("กรุณากรอกชื่อ-นามสกุล")),
@@ -60,16 +61,24 @@ export default function ContactPage() {
     if (Object.keys(nextErrors).length > 0) return;
 
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await api.post("/contact", {
+        name: name.trim(),
+        contact: contact.trim(),
+        message: message.trim(),
+      });
       setName("");
       setContact("");
       setMessage("");
       toast.success(
         "ส่งข้อความเรียบร้อย",
-        "ขอบคุณสำหรับข้อความ เจ้าหน้าที่จะติดต่อกลับโดยเร็วที่สุด",
+        "ข้อความถึงผู้ดูแลระบบแล้ว เจ้าหน้าที่จะติดต่อกลับโดยเร็วที่สุด",
       );
-    }, 600);
+    } catch (err) {
+      toast.error("ส่งข้อความไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (

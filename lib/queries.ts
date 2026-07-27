@@ -157,7 +157,14 @@ export type Conversation = {
   name: string | null;
   updated_at: string;
   members: {
-    user: { id: string; fname: string; lname: string | null; profile_image: string | null };
+    is_admin?: boolean;
+    user: {
+      id: string;
+      fname: string;
+      lname: string | null;
+      display_name?: string | null;
+      profile_image: string | null;
+    };
   }[];
   last_message:
     | { id: string; message: string; created_at: string; sender: Author }
@@ -389,6 +396,32 @@ export type DirectoryUser = {
   profile_image: string | null;
   department: { dept_name: string } | null;
 };
+
+// ---------- ระบบเพื่อน ----------
+
+export type FriendUser = {
+  id: string;
+  fname: string;
+  lname: string | null;
+  display_name?: string | null;
+  position: string | null;
+  profile_image: string | null;
+  department: { dept_name: string } | null;
+};
+
+export type FriendsResponse = {
+  friends: { friendship_id: string; since: string | null; user: FriendUser }[];
+  incoming: { friendship_id: string; user: FriendUser }[];
+  outgoing: { friendship_id: string; user: FriendUser }[];
+};
+
+export function useFriends(enabled = true) {
+  return useQuery({
+    queryKey: ["friends"],
+    queryFn: async () => (await api.get<FriendsResponse>("/friends")).data,
+    enabled,
+  });
+}
 
 export function useUserProfile(id: string | undefined) {
   return useQuery({
