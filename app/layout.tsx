@@ -21,8 +21,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${ibmPlexThai.variable} h-full antialiased`}>
+    <html
+      lang="th"
+      className={`${ibmPlexThai.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col">
+        {/* ตั้งธีมมืดจาก localStorage ก่อน paint แรก — กันจอกะพริบขาว */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}",
+          }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

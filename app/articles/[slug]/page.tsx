@@ -32,7 +32,13 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage, isUnauthorizedError } from "@/lib/api";
-import { useArticle, useArticles, useComments, useMe } from "@/lib/queries";
+import {
+  useArticle,
+  useArticles,
+  useComments,
+  useMe,
+  type ArticleComment,
+} from "@/lib/queries";
 import { fullName, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -128,13 +134,13 @@ export default function ArticleDetailPage() {
       queryClient.setQueryData<typeof article.data>(["article", slug], (old) =>
         old
           ? {
-              ...old,
-              liked_by_me: data.liked,
-              _count: {
-                ...old._count,
-                likes: old._count.likes + (data.liked ? 1 : -1),
-              },
-            }
+            ...old,
+            liked_by_me: data.liked,
+            _count: {
+              ...old._count,
+              likes: old._count.likes + (data.liked ? 1 : -1),
+            },
+          }
           : old,
       );
     },
@@ -209,6 +215,42 @@ export default function ArticleDetailPage() {
     onError: (err) => handleAuthError(err, "ลบบทความ"),
   });
 
+  // แก้ไขคอมเมนต์ของตัวเอง — inline ในการ์ดคอมเมนต์
+  const [editingComment, setEditingComment] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
+
+  const editCommentMutation = useMutation({
+    mutationFn: async () =>
+      api.patch(
+        `/articles/${article.data!.id}/comments/${editingComment!.id}`,
+        { content: editingComment!.text.trim() },
+      ),
+    onSuccess: () => {
+      toast.success("แก้ไขความคิดเห็นแล้ว");
+      setEditingComment(null);
+      queryClient.invalidateQueries({ queryKey: ["comments", article.data?.id] });
+    },
+    onError: (err) => handleAuthError(err, "แก้ไขความคิดเห็น"),
+  });
+
+  // ลบคอมเมนต์ (เจ้าของหรือแอดมิน) — ยืนยันผ่าน modal
+  const [deleteCommentTarget, setDeleteCommentTarget] =
+    useState<ArticleComment | null>(null);
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) =>
+      api.delete(`/articles/${article.data!.id}/comments/${commentId}`),
+    onSuccess: () => {
+      toast.success("ลบความคิดเห็นแล้ว");
+      setDeleteCommentTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["comments", article.data?.id] });
+      queryClient.invalidateQueries({ queryKey: ["article", slug] });
+    },
+    onError: (err) => handleAuthError(err, "ลบความคิดเห็น"),
+  });
+
   const commentLikeMutation = useMutation({
     mutationFn: async (commentId: string) =>
       api.post(`/articles/${article.data!.id}/comments/${commentId}/like`),
@@ -227,17 +269,17 @@ export default function ArticleDetailPage() {
     if (!href || href.startsWith("#")) return;
     const isFile = /\/uploads\/|res\.cloudinary\.com/.test(href);
     const kind = isFile ? "file" : "link";
-    api.post(`/articles/${article.data.id}/track`, { kind }).catch(() => {});
+    api.post(`/articles/${article.data.id}/track`, { kind }).catch(() => { });
     // อัปเดตยอดบนหน้าให้เห็นทันทีโดยไม่ต้อง refetch
     queryClient.setQueryData<typeof article.data>(["article", slug], (old) =>
       old
         ? {
-            ...old,
-            link_click_count:
-              (old.link_click_count ?? 0) + (kind === "link" ? 1 : 0),
-            file_download_count:
-              (old.file_download_count ?? 0) + (kind === "file" ? 1 : 0),
-          }
+          ...old,
+          link_click_count:
+            (old.link_click_count ?? 0) + (kind === "link" ? 1 : 0),
+          file_download_count:
+            (old.file_download_count ?? 0) + (kind === "file" ? 1 : 0),
+        }
         : old,
     );
   }
@@ -395,198 +437,252 @@ export default function ArticleDetailPage() {
             )}
 
             {!isGuest && (
-            <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-border pt-5">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => likeMutation.mutate()}
-                loading={likeMutation.isPending}
-                className={cn(
-                  "text-muted-foreground",
-                  a.liked_by_me && "font-semibold text-primary hover:text-primary",
-                )}
-              >
-                <ThumbsUp
-                  className={cn("h-4 w-4", a.liked_by_me && "fill-current")}
-                />
-                ถูกใจ ({a._count.likes})
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => bookmarkMutation.mutate()}
-                loading={bookmarkMutation.isPending}
-                className={cn(
-                  "text-muted-foreground",
-                  a.bookmarked_by_me &&
-                    "font-semibold text-primary hover:text-primary",
-                )}
-              >
-                <Bookmark
-                  className={cn("h-4 w-4", a.bookmarked_by_me && "fill-current")}
-                />
-                บุ๊คมาร์ค
-              </Button>
-              <ShareMenu title={a.title} />
-              <div className="ml-auto flex items-center gap-2">
-                {canDelete && (
-                  <Link href={`/articles/${a.slug}/edit`}>
-                    <Button variant="ghost" size="sm">
-                      <PencilLine className="h-4 w-4 text-primary" />
-                      แก้ไข
-                    </Button>
-                  </Link>
-                )}
-                {canDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:bg-destructive/5"
-                    onClick={() => setConfirmingDelete(true)}
-                    loading={deleteMutation.isPending}
-                  >
-                    {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
-                    ลบบทความ
-                  </Button>
-                )}
+              <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-border pt-5">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => setReportOpen(true)}
-                  loading={reportMutation.isPending}
+                  onClick={() => likeMutation.mutate()}
+                  loading={likeMutation.isPending}
+                  className={cn(
+                    "text-muted-foreground",
+                    a.liked_by_me && "font-semibold text-primary hover:text-primary",
+                  )}
                 >
-                  <Flag className="h-4 w-4" />
-                  รายงาน
+                  <ThumbsUp
+                    className={cn("h-4 w-4", a.liked_by_me && "fill-current")}
+                  />
+                  ถูกใจ ({a._count.likes})
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => bookmarkMutation.mutate()}
+                  loading={bookmarkMutation.isPending}
+                  className={cn(
+                    "text-muted-foreground",
+                    a.bookmarked_by_me &&
+                    "font-semibold text-primary hover:text-primary",
+                  )}
+                >
+                  <Bookmark
+                    className={cn("h-4 w-4", a.bookmarked_by_me && "fill-current")}
+                  />
+                  บุ๊คมาร์ค
+                </Button>
+                <ShareMenu title={a.title} />
+                <div className="ml-auto flex items-center gap-2">
+                  {canDelete && (
+                    <Link href={`/articles/${a.slug}/edit`}>
+                      <Button variant="ghost" size="sm">
+                        <PencilLine className="h-4 w-4 text-primary" />
+                        แก้ไข
+                      </Button>
+                    </Link>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/5"
+                      onClick={() => setConfirmingDelete(true)}
+                      loading={deleteMutation.isPending}
+                    >
+                      {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
+                      ลบบทความ
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => setReportOpen(true)}
+                    loading={reportMutation.isPending}
+                  >
+                    <Flag className="h-4 w-4" />
+                    รายงาน
+                  </Button>
+                </div>
               </div>
-            </div>
             )}
           </Card>
 
           {/* Comments */}
           {!isGuest && (
-          <Card className="mt-6 p-6">
-            <h2 className="flex items-center gap-2 font-bold">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              ความคิดเห็น ({comments.data?.length ?? 0})
-            </h2>
+            <Card className="mt-6 p-6">
+              <h2 className="flex items-center gap-2 font-bold">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                ความคิดเห็น ({comments.data?.length ?? 0})
+              </h2>
 
-            <form className="mt-4 flex gap-3" onSubmit={submitComment}>
-              <div className="flex-1">
-                <Textarea
-                  ref={commentBoxRef}
-                  rows={3}
-                  placeholder="แสดงความคิดเห็นของคุณ..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  disabled={commentMutation.isPending}
-                />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <EmojiPickerButton
-                      onPick={(emoji) => insertIntoComment(emoji)}
-                      disabled={commentMutation.isPending}
-                    />
-                    <input
-                      ref={commentImageRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => attachCommentImage(e.target.files)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      aria-label="แนบรูปภาพ"
-                      title="แนบรูปภาพ"
-                      loading={uploadingCommentImage}
-                      disabled={commentMutation.isPending}
-                      onClick={() => commentImageRef.current?.click()}
-                    >
-                      {!uploadingCommentImage && (
-                        <ImagePlus className="h-4 w-4 text-muted-foreground" />
-                      )}
+              <form className="mt-4 flex gap-3" onSubmit={submitComment}>
+                <div className="flex-1">
+                  <Textarea
+                    ref={commentBoxRef}
+                    rows={3}
+                    placeholder="แสดงความคิดเห็นของคุณ..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    disabled={commentMutation.isPending}
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <EmojiPickerButton
+                        onPick={(emoji) => insertIntoComment(emoji)}
+                        disabled={commentMutation.isPending}
+                      />
+                      <input
+                        ref={commentImageRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => attachCommentImage(e.target.files)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="แนบรูปภาพ"
+                        title="แนบรูปภาพ"
+                        loading={uploadingCommentImage}
+                        disabled={commentMutation.isPending}
+                        onClick={() => commentImageRef.current?.click()}
+                      >
+                        {!uploadingCommentImage && (
+                          <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                    <Button size="sm" type="submit" loading={commentMutation.isPending}>
+                      {!commentMutation.isPending && <Send className="h-4 w-4" />}
+                      ส่งความคิดเห็น
                     </Button>
                   </div>
-                  <Button size="sm" type="submit" loading={commentMutation.isPending}>
-                    {!commentMutation.isPending && <Send className="h-4 w-4" />}
-                    ส่งความคิดเห็น
-                  </Button>
                 </div>
-              </div>
-            </form>
+              </form>
 
-            <div className="mt-5 space-y-5">
-              {comments.data?.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground">
-                  ยังไม่มีความคิดเห็น — เป็นคนแรกที่แสดงความคิดเห็นเลย
-                </p>
-              )}
-              {comments.data?.map((c) => {
-                const name = fullName(c.user);
-                return (
-                  <div key={c.id} className="flex gap-3">
-                    <Avatar name={name} src={c.user.profile_image} size="sm" />
-                    <div className="flex-1 rounded-xl bg-muted p-3.5">
-                      <div className="flex items-center justify-between gap-2">
-                        {c.user.id ? (
-                          <Link
-                            href={`/users/${c.user.id}`}
-                            className="text-sm font-semibold hover:text-primary hover:underline"
-                          >
-                            {name}
-                          </Link>
-                        ) : (
-                          <p className="text-sm font-semibold">{name}</p>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {timeAgo(c.created_at)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
-                        <RichText text={c.content} />
-                      </p>
-                      <div className="mt-2 flex items-center gap-4 text-xs">
-                        <button
-                          className={cn(
-                            "flex items-center gap-1 text-muted-foreground hover:text-primary",
-                            c.liked_by_me && "font-semibold text-primary",
+              <div className="mt-5 space-y-5">
+                {comments.data?.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    ยังไม่มีความคิดเห็น — เป็นคนแรกที่แสดงความคิดเห็นเลย
+                  </p>
+                )}
+                {comments.data?.map((c) => {
+                  const name = fullName(c.user);
+                  return (
+                    <div key={c.id} className="flex gap-3">
+                      <Avatar name={name} src={c.user.profile_image} size="sm" />
+                      <div className="flex-1 rounded-xl bg-muted p-3.5">
+                        <div className="flex items-center justify-between gap-2">
+                          {c.user.id ? (
+                            <Link
+                              href={`/users/${c.user.id}`}
+                              className="text-sm font-semibold hover:text-primary hover:underline"
+                            >
+                              {name}
+                            </Link>
+                          ) : (
+                            <p className="text-sm font-semibold">{name}</p>
                           )}
-                          onClick={() => commentLikeMutation.mutate(c.id)}
-                        >
-                          <ThumbsUp
+                          <span className="text-xs text-muted-foreground">
+                            {timeAgo(c.created_at)}
+                          </span>
+                        </div>
+                        {editingComment?.id === c.id ? (
+                          <div className="mt-2">
+                            <Textarea
+                              rows={3}
+                              value={editingComment.text}
+                              onChange={(e) =>
+                                setEditingComment({
+                                  id: c.id,
+                                  text: e.target.value,
+                                })
+                              }
+                              disabled={editCommentMutation.isPending}
+                            />
+                            <div className="mt-2 flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingComment(null)}
+                                disabled={editCommentMutation.isPending}
+                              >
+                                ยกเลิก
+                              </Button>
+                              <Button
+                                size="sm"
+                                loading={editCommentMutation.isPending}
+                                disabled={!editingComment.text.trim()}
+                                onClick={() => editCommentMutation.mutate()}
+                              >
+                                บันทึก
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+                            <RichText text={c.content} />
+                          </p>
+                        )}
+                        <div className="mt-2 flex items-center gap-4 text-xs">
+                          <button
                             className={cn(
-                              "h-3.5 w-3.5",
-                              c.liked_by_me && "fill-current",
+                              "flex items-center gap-1 text-muted-foreground hover:text-primary",
+                              c.liked_by_me && "font-semibold text-primary",
                             )}
-                          />
-                          ถูกใจ ({c._count.likes})
-                        </button>
-                        <button
-                          className="text-muted-foreground hover:text-primary"
-                          onClick={() => replyToComment(name)}
-                        >
-                          ตอบกลับ
-                        </button>
-                        <button
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => {
-                            setReportCommentId(c.id);
-                            setReportOpen(true);
-                          }}
-                        >
-                          รายงาน
-                        </button>
+                            onClick={() => commentLikeMutation.mutate(c.id)}
+                          >
+                            <ThumbsUp
+                              className={cn(
+                                "h-3.5 w-3.5",
+                                c.liked_by_me && "fill-current",
+                              )}
+                            />
+                            ถูกใจ ({c._count.likes})
+                          </button>
+                          <button
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={() => replyToComment(name)}
+                          >
+                            ตอบกลับ
+                          </button>
+                          <button
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              setReportCommentId(c.id);
+                              setReportOpen(true);
+                            }}
+                          >
+                            รายงาน
+                          </button>
+                          {!!me.data && c.user.id === me.data.id && (
+                            <button
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() =>
+                                setEditingComment({ id: c.id, text: c.content })
+                              }
+                            >
+                              แก้ไข
+                            </button>
+                          )}
+                          {!!me.data &&
+                            (me.data.role.role_name === "ADMIN" ||
+                              c.user.id === me.data.id) && (
+                              <button
+                                className="text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteCommentTarget(c)}
+                              >
+                                ลบ
+                              </button>
+                            )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+                  );
+                })}
+              </div>
+            </Card>
           )}
         </div>
 
@@ -629,6 +725,20 @@ export default function ArticleDetailPage() {
           )}
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteCommentTarget}
+        danger
+        title="ลบความคิดเห็นนี้?"
+        description={`"${deleteCommentTarget?.content.slice(0, 80) ?? ""}${(deleteCommentTarget?.content.length ?? 0) > 80 ? "…" : ""}" — การลบย้อนกลับไม่ได้`}
+        confirmLabel="ลบความคิดเห็น"
+        loading={deleteCommentMutation.isPending}
+        onConfirm={() =>
+          deleteCommentTarget &&
+          deleteCommentMutation.mutate(deleteCommentTarget.id)
+        }
+        onCancel={() => setDeleteCommentTarget(null)}
+      />
 
       <ConfirmDialog
         open={confirmingDelete}

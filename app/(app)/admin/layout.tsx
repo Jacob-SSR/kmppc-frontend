@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   BookMarked,
   Flag,
   LayoutDashboard,
@@ -20,6 +21,7 @@ const adminTabs = [
   { href: "/admin/categories", label: "หมวดหมู่", icon: LayoutGrid },
   { href: "/admin/tags", label: "แท็ก", icon: Tags },
   { href: "/admin/knowledge", label: "คลังเอกสาร AI", icon: BookMarked },
+  { href: "/admin/stats", label: "สถิติ", icon: BarChart3 },
   { href: "/admin/reports", label: "รายงานเนื้อหา", icon: Flag },
   { href: "/admin/settings", label: "ตั้งค่าระบบ", icon: Settings },
 ];

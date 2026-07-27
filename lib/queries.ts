@@ -169,6 +169,7 @@ export type ChatMessage = {
   id: string;
   message: string;
   created_at: string;
+  edited_at?: string | null;
   sender: { id: string; fname: string; lname: string | null; profile_image: string | null };
 };
 

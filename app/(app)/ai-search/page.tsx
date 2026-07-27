@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   ExternalLink,
   FileQuestion,
   FileText,
   Globe,
+  History,
   MessagesSquare,
   Send,
   Sparkles,
@@ -22,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { RichText } from "@/components/rich-text";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
 
 type AiSource = {
   source_type?: "ARTICLE" | "DISCUSSION" | "DOCUMENT" | string;
@@ -80,7 +82,10 @@ function AiSearchContent() {
       setIsWebResult(false);
       setFeedbackSent(null);
     },
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["ai-history"] });
+    },
     onError: (err) =>
       toast.error("ถาม AI ไม่สำเร็จ", getApiErrorMessage(err)),
   });
@@ -111,6 +116,18 @@ function AiSearchContent() {
   });
 
   const loading = askMutation.isPending || webMutation.isPending;
+  const queryClient = useQueryClient();
+
+  // ประวัติคำถามของฉัน — refresh หลังถามเสร็จแต่ละครั้ง
+  const historyQuery = useQuery({
+    queryKey: ["ai-history"],
+    queryFn: async () =>
+      (
+        await api.get<
+          { id: string; query: string; created_at: string }[]
+        >("/ai-search/history")
+      ).data,
+  });
 
   // มี ?q= ติดมา → ยิงถามอัตโนมัติครั้งเดียวตอนเข้าหน้า
   const autoAskedRef = useRef(false);
@@ -353,6 +370,30 @@ function AiSearchContent() {
           ))}
         </div>
       </Card>
+
+      {(historyQuery.data?.length ?? 0) > 0 && (
+        <Card className="mt-6 p-5">
+          <h3 className="flex items-center gap-1.5 text-sm font-bold">
+            <History className="h-4 w-4 text-primary" />
+            ประวัติคำถามของฉัน
+          </h3>
+          <div className="mt-3 space-y-1">
+            {historyQuery.data!.slice(0, 8).map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => ask(h.query)}
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
+              >
+                <span className="min-w-0 flex-1 truncate">{h.query}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {timeAgo(h.created_at)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

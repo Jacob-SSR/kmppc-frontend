@@ -16,6 +16,7 @@ import {
   User,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useMe, useNotifications } from "@/lib/queries";
 import { initial } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export default function AppLayout({
             <Logo />
           </Link>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <Link
               href="/notifications"
               className="relative text-muted-foreground hover:text-foreground"

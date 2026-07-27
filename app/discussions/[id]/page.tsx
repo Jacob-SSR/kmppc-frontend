@@ -75,13 +75,13 @@ export default function DiscussionDetailPage() {
         (old) =>
           old
             ? {
-                ...old,
-                liked_by_me: data.liked,
-                _count: {
-                  ...old._count,
-                  likes: old._count.likes + (data.liked ? 1 : -1),
-                },
-              }
+              ...old,
+              liked_by_me: data.liked,
+              _count: {
+                ...old._count,
+                likes: old._count.likes + (data.liked ? 1 : -1),
+              },
+            }
             : old,
       );
     },
@@ -216,6 +216,39 @@ export default function DiscussionDetailPage() {
     onError: (err) => handleAuthError(err, "ลบกระทู้"),
   });
 
+  // แก้ไขคำตอบของตัวเอง — inline ในการ์ดคำตอบ
+  const [editingReply, setEditingReply] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
+
+  const editReplyMutation = useMutation({
+    mutationFn: async () =>
+      api.patch(`/discussions/${id}/replies/${editingReply!.id}`, {
+        content: editingReply!.text.trim(),
+      }),
+    onSuccess: () => {
+      toast.success("แก้ไขคำตอบแล้ว");
+      setEditingReply(null);
+      refetchThread();
+    },
+    onError: (err) => handleAuthError(err, "แก้ไขคำตอบ"),
+  });
+
+  // ลบคำตอบ (เจ้าของหรือแอดมิน) — ยืนยันผ่าน modal
+  const [deleteReplyTarget, setDeleteReplyTarget] = useState<Reply | null>(null);
+
+  const deleteReplyMutation = useMutation({
+    mutationFn: async (replyId: string) =>
+      api.delete(`/discussions/${id}/replies/${replyId}`),
+    onSuccess: () => {
+      toast.success("ลบคำตอบแล้ว");
+      setDeleteReplyTarget(null);
+      refetchThread();
+    },
+    onError: (err) => handleAuthError(err, "ลบคำตอบ"),
+  });
+
   const bestAnswerMutation = useMutation({
     mutationFn: async (replyId: string) =>
       api.post(`/discussions/${id}/replies/${replyId}/best-answer`),
@@ -324,9 +357,40 @@ export default function DiscussionDetailPage() {
               {timeAgo(r.created_at)}
             </span>
           </div>
-          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">
-            <RichText text={r.content} />
-          </p>
+          {editingReply?.id === r.id ? (
+            <div className="mt-2">
+              <Textarea
+                rows={3}
+                value={editingReply.text}
+                onChange={(e) =>
+                  setEditingReply({ id: r.id, text: e.target.value })
+                }
+                disabled={editReplyMutation.isPending}
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingReply(null)}
+                  disabled={editReplyMutation.isPending}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  size="sm"
+                  loading={editReplyMutation.isPending}
+                  disabled={!editingReply.text.trim()}
+                  onClick={() => editReplyMutation.mutate()}
+                >
+                  บันทึก
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">
+              <RichText text={r.content} />
+            </p>
+          )}
           <div className="mt-2.5 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <ThumbsUp className="h-3.5 w-3.5" /> ถูกใจ ({r._count.likes})
@@ -346,6 +410,24 @@ export default function DiscussionDetailPage() {
             >
               รายงาน
             </button>
+            {!!me.data && !r.is_anonymous && r.author.id === me.data.id && (
+              <button
+                className="hover:text-primary"
+                onClick={() => setEditingReply({ id: r.id, text: r.content })}
+              >
+                แก้ไข
+              </button>
+            )}
+            {!!me.data &&
+              (me.data.role.role_name === "ADMIN" ||
+                (!r.is_anonymous && r.author.id === me.data.id)) && (
+                <button
+                  className="hover:text-destructive"
+                  onClick={() => setDeleteReplyTarget(r)}
+                >
+                  ลบ
+                </button>
+              )}
             {canPickBest && !r.is_best_answer && !r.parent_reply_id && (
               <button
                 className="flex items-center gap-1 hover:text-emerald-700"
@@ -451,195 +533,208 @@ export default function DiscussionDetailPage() {
           )}
 
           {!isGuest && (
-          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => likeMutation.mutate()}
-              loading={likeMutation.isPending}
-              className={cn(
-                "text-muted-foreground",
-                d.liked_by_me && "font-semibold text-primary hover:text-primary",
-              )}
-            >
-              <ThumbsUp
-                className={cn("h-4 w-4", d.liked_by_me && "fill-current")}
-              />
-              ถูกใจ ({d._count.likes})
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => bookmarkMutation.mutate()}
-              loading={bookmarkMutation.isPending}
-              className={cn(
-                "text-muted-foreground",
-                d.bookmarked_by_me &&
-                  "font-semibold text-primary hover:text-primary",
-              )}
-            >
-              <Bookmark
-                className={cn("h-4 w-4", d.bookmarked_by_me && "fill-current")}
-              />
-              บุ๊คมาร์ค
-            </Button>
-            <ShareMenu title={d.title} />
-            <div className="ml-auto flex items-center gap-2">
-              {canDelete && (
-                <Link href={`/discussions/${d.id}/edit`}>
-                  <Button variant="ghost" size="sm">
-                    <PencilLine className="h-4 w-4 text-primary" />
-                    แก้ไข
-                  </Button>
-                </Link>
-              )}
-              {canDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive/5"
-                  onClick={() => setConfirmingDelete(true)}
-                  loading={deleteMutation.isPending}
-                >
-                  {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
-                  ลบกระทู้
-                </Button>
-              )}
+            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-border pt-4">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground"
-                onClick={() => setReportOpen(true)}
-                loading={reportMutation.isPending}
+                onClick={() => likeMutation.mutate()}
+                loading={likeMutation.isPending}
+                className={cn(
+                  "text-muted-foreground",
+                  d.liked_by_me && "font-semibold text-primary hover:text-primary",
+                )}
               >
-                <Flag className="h-4 w-4" />
-                รายงาน
+                <ThumbsUp
+                  className={cn("h-4 w-4", d.liked_by_me && "fill-current")}
+                />
+                ถูกใจ ({d._count.likes})
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => bookmarkMutation.mutate()}
+                loading={bookmarkMutation.isPending}
+                className={cn(
+                  "text-muted-foreground",
+                  d.bookmarked_by_me &&
+                  "font-semibold text-primary hover:text-primary",
+                )}
+              >
+                <Bookmark
+                  className={cn("h-4 w-4", d.bookmarked_by_me && "fill-current")}
+                />
+                บุ๊คมาร์ค
+              </Button>
+              <ShareMenu title={d.title} />
+              <div className="ml-auto flex items-center gap-2">
+                {canDelete && (
+                  <Link href={`/discussions/${d.id}/edit`}>
+                    <Button variant="ghost" size="sm">
+                      <PencilLine className="h-4 w-4 text-primary" />
+                      แก้ไข
+                    </Button>
+                  </Link>
+                )}
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/5"
+                    onClick={() => setConfirmingDelete(true)}
+                    loading={deleteMutation.isPending}
+                  >
+                    {!deleteMutation.isPending && <Trash2 className="h-4 w-4" />}
+                    ลบกระทู้
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => setReportOpen(true)}
+                  loading={reportMutation.isPending}
+                >
+                  <Flag className="h-4 w-4" />
+                  รายงาน
+                </Button>
+              </div>
             </div>
-          </div>
           )}
         </Card>
 
         {!isGuest && (
-        <>
-        <h2 className="mt-8 flex items-center gap-2 font-bold">
-          <MessageCircle className="h-5 w-5 text-primary" />
-          {replies.length} คำตอบ
-        </h2>
+          <>
+            <h2 className="mt-8 flex items-center gap-2 font-bold">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              {replies.length} คำตอบ
+            </h2>
 
-        <div className="mt-4 space-y-4">
-          {replies.length === 0 && (
-            <Card className="p-8 text-center text-sm text-muted-foreground">
-              ยังไม่มีคำตอบ — เป็นคนแรกที่ช่วยตอบกระทู้นี้เลย
-            </Card>
-          )}
-          {topLevelReplies.map((r) => {
-            const children = childrenOf(r.id);
-            return (
-              <Card
-                key={r.id}
-                className={cn(
-                  "p-5",
-                  r.is_best_answer && "border-emerald-300 bg-emerald-50/50",
-                )}
-              >
-                {r.is_best_answer && (
-                  <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
-                    <Award className="h-4 w-4" /> คำตอบที่ดีที่สุด
-                  </p>
-                )}
-                {renderReplyItem(r)}
-                {children.length > 0 && (
-                  <div className="ml-6 mt-3 space-y-3 border-l-2 border-border pl-4">
-                    {children.map((c) => (
-                      <div key={c.id}>{renderReplyItem(c)}</div>
-                    ))}
+            <div className="mt-4 space-y-4">
+              {replies.length === 0 && (
+                <Card className="p-8 text-center text-sm text-muted-foreground">
+                  ยังไม่มีคำตอบ — เป็นคนแรกที่ช่วยตอบกระทู้นี้เลย
+                </Card>
+              )}
+              {topLevelReplies.map((r) => {
+                const children = childrenOf(r.id);
+                return (
+                  <Card
+                    key={r.id}
+                    className={cn(
+                      "p-5",
+                      r.is_best_answer && "border-emerald-300 bg-emerald-50/50",
+                    )}
+                  >
+                    {r.is_best_answer && (
+                      <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                        <Award className="h-4 w-4" /> คำตอบที่ดีที่สุด
+                      </p>
+                    )}
+                    {renderReplyItem(r)}
+                    {children.length > 0 && (
+                      <div className="ml-6 mt-3 space-y-3 border-l-2 border-border pl-4">
+                        {children.map((c) => (
+                          <div key={c.id}>{renderReplyItem(c)}</div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Reply form */}
+            <Card className="mt-6 p-5">
+              <h3 className="font-bold">ตอบกระทู้นี้</h3>
+              {replyTo && (
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-sm">
+                  <span className="text-secondary-foreground">
+                    กำลังตอบกลับคำตอบของ{" "}
+                    <span className="font-semibold">{replyTo.name}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTo(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              )}
+              <form className="mt-3" onSubmit={submitReply}>
+                <Textarea
+                  ref={replyBoxRef}
+                  rows={4}
+                  placeholder={
+                    replyTo
+                      ? `ตอบกลับคุณ${replyTo.name}...`
+                      : "เขียนคำตอบของคุณ..."
+                  }
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  disabled={replyMutation.isPending}
+                />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <EmojiPickerButton
+                      onPick={(emoji) => insertIntoReply(emoji)}
+                      disabled={replyMutation.isPending}
+                    />
+                    <input
+                      ref={replyImageRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => attachReplyImage(e.target.files)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label="แนบรูปภาพ"
+                      title="แนบรูปภาพ"
+                      loading={uploadingReplyImage}
+                      disabled={replyMutation.isPending}
+                      onClick={() => replyImageRef.current?.click()}
+                    >
+                      {!uploadingReplyImage && (
+                        <ImagePlus className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                    <label className="ml-1 flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={anonymous}
+                        onChange={(e) => setAnonymous(e.target.checked)}
+                        className="h-4 w-4 rounded border-input accent-[var(--primary)]"
+                      />
+                      ตอบแบบไม่ระบุตัวตน
+                    </label>
                   </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Reply form */}
-        <Card className="mt-6 p-5">
-          <h3 className="font-bold">ตอบกระทู้นี้</h3>
-          {replyTo && (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-sm">
-              <span className="text-secondary-foreground">
-                กำลังตอบกลับคำตอบของ{" "}
-                <span className="font-semibold">{replyTo.name}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setReplyTo(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ยกเลิก
-              </button>
-            </div>
-          )}
-          <form className="mt-3" onSubmit={submitReply}>
-            <Textarea
-              ref={replyBoxRef}
-              rows={4}
-              placeholder={
-                replyTo
-                  ? `ตอบกลับคุณ${replyTo.name}...`
-                  : "เขียนคำตอบของคุณ..."
-              }
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              disabled={replyMutation.isPending}
-            />
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5">
-                <EmojiPickerButton
-                  onPick={(emoji) => insertIntoReply(emoji)}
-                  disabled={replyMutation.isPending}
-                />
-                <input
-                  ref={replyImageRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => attachReplyImage(e.target.files)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label="แนบรูปภาพ"
-                  title="แนบรูปภาพ"
-                  loading={uploadingReplyImage}
-                  disabled={replyMutation.isPending}
-                  onClick={() => replyImageRef.current?.click()}
-                >
-                  {!uploadingReplyImage && (
-                    <ImagePlus className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-                <label className="ml-1 flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={anonymous}
-                    onChange={(e) => setAnonymous(e.target.checked)}
-                    className="h-4 w-4 rounded border-input accent-[var(--primary)]"
-                  />
-                  ตอบแบบไม่ระบุตัวตน
-                </label>
-              </div>
-              <Button type="submit" loading={replyMutation.isPending}>
-                {!replyMutation.isPending && <Send className="h-4 w-4" />}
-                ส่งคำตอบ
-              </Button>
-            </div>
-          </form>
-        </Card>
-        </>
+                  <Button type="submit" loading={replyMutation.isPending}>
+                    {!replyMutation.isPending && <Send className="h-4 w-4" />}
+                    ส่งคำตอบ
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteReplyTarget}
+        danger
+        title="ลบคำตอบนี้?"
+        description={`"${deleteReplyTarget?.content.slice(0, 80) ?? ""}${(deleteReplyTarget?.content.length ?? 0) > 80 ? "…" : ""}" — การลบย้อนกลับไม่ได้`}
+        confirmLabel="ลบคำตอบ"
+        loading={deleteReplyMutation.isPending}
+        onConfirm={() =>
+          deleteReplyTarget && deleteReplyMutation.mutate(deleteReplyTarget.id)
+        }
+        onCancel={() => setDeleteReplyTarget(null)}
+      />
 
       <ConfirmDialog
         open={confirmingDelete}

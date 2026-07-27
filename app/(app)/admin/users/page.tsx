@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, UserCheck, UserPlus, UserX } from "lucide-react";
+import { Search, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,20 @@ export default function AdminUsersPage() {
   const users = useAdminUsers({ limit: 50, q: debouncedQ.trim() || undefined });
   // บัญชีที่กำลังจะปิดการใช้งาน — ต้องยืนยันผ่าน modal ก่อน
   const [confirmUser, setConfirmUser] = useState<Me | null>(null);
+  // บัญชี (ทดสอบ) ที่กำลังจะลบถาวรพร้อมข้อมูลทั้งหมด
+  const [purgeUser, setPurgeUser] = useState<Me | null>(null);
+
+  const purgeMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/users/${id}`),
+    onSuccess: () => {
+      toast.success("ลบบัญชีถาวรแล้ว", "ข้อมูลและโพสต์ทั้งหมดถูกลบออกจากระบบ");
+      setPurgeUser(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+    },
+    onError: (err) => toast.error("ลบบัญชีไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) =>
@@ -149,6 +163,18 @@ export default function AdminUsersPage() {
                         )}
                       </Button>
                     )}
+                    {u.id !== me.data?.id && u.role.role_name !== "ADMIN" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="ลบบัญชีถาวร"
+                        title="ลบบัญชีถาวร (สำหรับบัญชีทดสอบ)"
+                        onClick={() => setPurgeUser(u)}
+                        disabled={purgeMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -179,6 +205,17 @@ export default function AdminUsersPage() {
           toggleMutation.mutate({ id: confirmUser.id, is_active: false })
         }
         onCancel={() => setConfirmUser(null)}
+      />
+
+      <ConfirmDialog
+        open={!!purgeUser}
+        danger
+        title={`ลบบัญชี "${purgeUser?.fname ?? ""} ${purgeUser?.lname ?? ""}" ถาวร?`}
+        description="บัญชีนี้พร้อมโพสต์ คอมเมนต์ แชท และข้อมูลทั้งหมดจะถูกลบออกจากระบบทันที กู้คืนไม่ได้ — ใช้กับบัญชีทดสอบเท่านั้น ถ้าเป็นพนักงานจริงให้ใช้ 'ปิดการใช้งาน' แทน"
+        confirmLabel="ลบถาวร"
+        loading={purgeMutation.isPending}
+        onConfirm={() => purgeUser && purgeMutation.mutate(purgeUser.id)}
+        onCancel={() => setPurgeUser(null)}
       />
     </div>
   );

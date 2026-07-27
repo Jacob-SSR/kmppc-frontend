@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, FilePlus2, Trash2, X } from "lucide-react";
+import { BookMarked, FilePlus2, RefreshCw, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -49,6 +49,23 @@ export default function AdminKnowledgePage() {
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["knowledge-docs"] });
   }
+
+  // Re-index ทั้งระบบ — ใช้หลังใส่ GEMINI_API_KEY ให้ AI รู้จักเนื้อหาเก่าทั้งหมด
+  const [confirmReindex, setConfirmReindex] = useState(false);
+  const reindexMutation = useMutation({
+    mutationFn: async () =>
+      (await api.post<{ total: number }>("/ai-search/reindex-all")).data,
+    onSuccess: (data) => {
+      setConfirmReindex(false);
+      toast.success(
+        `เริ่มทำดัชนีใหม่แล้ว ${data.total} รายการ`,
+        "ระบบทยอยทำเบื้องหลัง ดูสถานะได้จากคอลัมน์ index ของเอกสาร",
+      );
+      refetch();
+    },
+    onError: (err) =>
+      toast.error("สั่งทำดัชนีไม่สำเร็จ", getApiErrorMessage(err)),
+  });
 
   const createMutation = useMutation({
     mutationFn: async () =>
@@ -98,11 +115,32 @@ export default function AdminKnowledgePage() {
         <p className="text-sm text-muted-foreground">
           เอกสารในคลังนี้จะถูกนำไปใช้เป็นฐานความรู้ให้ AI Search ตอบคำถาม
         </p>
-        <Button variant="dark" size="sm" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? <X className="h-4 w-4" /> : <FilePlus2 className="h-4 w-4" />}
-          {showForm ? "ยกเลิก" : "เพิ่มเอกสาร"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ai"
+            size="sm"
+            onClick={() => setConfirmReindex(true)}
+            loading={reindexMutation.isPending}
+          >
+            {!reindexMutation.isPending && <RefreshCw className="h-4 w-4" />}
+            Re-index ทั้งหมด
+          </Button>
+          <Button variant="dark" size="sm" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? <X className="h-4 w-4" /> : <FilePlus2 className="h-4 w-4" />}
+            {showForm ? "ยกเลิก" : "เพิ่มเอกสาร"}
+          </Button>
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmReindex}
+        title="ทำดัชนี AI ใหม่ทั้งระบบ?"
+        description="ระบบจะทยอยทำดัชนีบทความที่เผยแพร่ กระทู้ที่แก้ไขแล้ว และเอกสารทั้งหมดใหม่ เพื่อให้ AI Search รู้จักเนื้อหาเก่าครบถ้วน — ใช้เวลาสักครู่และใช้โควตา AI ตามจำนวนเนื้อหา"
+        confirmLabel="เริ่มทำดัชนี"
+        loading={reindexMutation.isPending}
+        onConfirm={() => reindexMutation.mutate()}
+        onCancel={() => setConfirmReindex(false)}
+      />
 
       {showForm && (
         <Card className="mt-4 p-5">

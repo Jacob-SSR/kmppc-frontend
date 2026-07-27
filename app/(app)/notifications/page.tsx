@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
@@ -55,7 +56,14 @@ export default function NotificationsPage() {
     if (!n.is_read) readMutation.mutate(n.id);
   }
 
-  const items = notifications.data?.items ?? [];
+  // แท็บ: ทั้งหมด / เฉพาะแจ้งปัญหาระบบ (สำหรับทีมนักวิชาการคอมพิวเตอร์)
+  const [tab, setTab] = useState<"all" | "issues">("all");
+  const isIssue = (n: AppNotification) =>
+    n.type === "SYSTEM" && n.title.includes("แจ้งปัญหา");
+
+  const allItems = notifications.data?.items ?? [];
+  const issueCount = allItems.filter(isIssue).length;
+  const items = tab === "issues" ? allItems.filter(isIssue) : allItems;
   const unread = notifications.data?.unread_count ?? 0;
 
   return (
@@ -83,6 +91,29 @@ export default function NotificationsPage() {
           อ่านทั้งหมดแล้ว
         </Button>
       </div>
+
+      {issueCount > 0 && (
+        <div className="mt-5 flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+          <button
+            className={cn(
+              "rounded-md px-3 py-1.5 transition-colors",
+              tab === "all" && "bg-card font-semibold shadow-sm",
+            )}
+            onClick={() => setTab("all")}
+          >
+            ทั้งหมด
+          </button>
+          <button
+            className={cn(
+              "rounded-md px-3 py-1.5 transition-colors",
+              tab === "issues" && "bg-card font-semibold shadow-sm",
+            )}
+            onClick={() => setTab("issues")}
+          >
+            🐞 แจ้งปัญหา ({issueCount})
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 space-y-2">
         {notifications.isLoading &&

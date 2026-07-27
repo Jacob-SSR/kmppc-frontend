@@ -9,12 +9,16 @@ import {
   MessageCircle,
   MessageCirclePlus,
   Paperclip,
+  PencilLine,
   Search,
   Send,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmojiPickerButton } from "@/components/emoji-picker";
 import { Input } from "@/components/ui/input";
 import { RichText } from "@/components/rich-text";
@@ -258,10 +262,49 @@ function ChatContent() {
     onError: (err) => toast.error("ส่งข้อความไม่สำเร็จ", getApiErrorMessage(err)),
   });
 
+  // ---------- แก้ไข/ลบข้อความของตัวเอง ----------
+  const [editingMsg, setEditingMsg] = useState<string | null>(null);
+  const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
+
+  const editMsgMutation = useMutation({
+    mutationFn: async () =>
+      api.patch(`/chat/messages/${editingMsg}`, { message: text.trim() }),
+    onSuccess: () => {
+      setText("");
+      setEditingMsg(null);
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) =>
+      toast.error("แก้ไขข้อความไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
+  const deleteMsgMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/chat/messages/${id}`),
+    onSuccess: () => {
+      setDeleteMsgId(null);
+      toast.success("ลบข้อความแล้ว");
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", activeId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) => toast.error("ลบข้อความไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
+  function startEditMsg(id: string, current: string) {
+    setEditingMsg(id);
+    setText(current);
+  }
+
+  function cancelEditMsg() {
+    setEditingMsg(null);
+    setText("");
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim() || !activeId) return;
-    sendMutation.mutate();
+    if (editingMsg) editMsgMutation.mutate();
+    else sendMutation.mutate();
   }
 
   // แนบไฟล์ในแชท — อัปโหลดแล้วส่งเป็นข้อความลิงก์
@@ -654,7 +697,7 @@ function ChatContent() {
                   <div
                     key={m.id}
                     className={cn(
-                      "flex items-end gap-2",
+                      "group flex items-end gap-2",
                       mine && "flex-row-reverse",
                     )}
                   >
@@ -692,15 +735,54 @@ function ChatContent() {
                           mine ? "text-white/70" : "text-muted-foreground",
                         )}
                       >
+                        {m.edited_at && "แก้ไขแล้ว · "}
                         {timeAgo(m.created_at)}
                       </span>
                     </div>
+                    {/* ปุ่มแก้ไข/ลบ — เฉพาะข้อความตัวเอง โผล่ตอน hover */}
+                    {mine && (
+                      <div className="flex gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          type="button"
+                          aria-label="แก้ไขข้อความ"
+                          title="แก้ไขข้อความ"
+                          onClick={() => startEditMsg(m.id, m.message)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="ลบข้อความ"
+                          title="ลบข้อความ"
+                          onClick={() => setDeleteMsgId(m.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
               <div ref={bottomRef} />
             </div>
 
+            {editingMsg && (
+              <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/60 px-4 py-2 text-xs">
+                <span className="flex items-center gap-1.5 text-primary-dark">
+                  <PencilLine className="h-3.5 w-3.5" />
+                  กำลังแก้ไขข้อความ
+                </span>
+                <button
+                  type="button"
+                  onClick={cancelEditMsg}
+                  className="flex items-center gap-1 text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5" /> ยกเลิก
+                </button>
+              </div>
+            )}
             <form
               className="flex items-center gap-2 border-t border-border bg-card p-3"
               onSubmit={submit}
@@ -737,15 +819,32 @@ function ChatContent() {
               <Button
                 type="submit"
                 size="icon"
-                aria-label="ส่งข้อความ"
-                loading={sendMutation.isPending}
+                aria-label={editingMsg ? "บันทึกการแก้ไข" : "ส่งข้อความ"}
+                loading={sendMutation.isPending || editMsgMutation.isPending}
               >
-                {!sendMutation.isPending && <Send className="h-4 w-4" />}
+                {!sendMutation.isPending &&
+                  !editMsgMutation.isPending &&
+                  (editingMsg ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  ))}
               </Button>
             </form>
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={!!deleteMsgId}
+        danger
+        title="ลบข้อความนี้?"
+        description="ข้อความจะหายไปจากห้องแชทของทุกคน — การลบย้อนกลับไม่ได้"
+        confirmLabel="ลบข้อความ"
+        loading={deleteMsgMutation.isPending}
+        onConfirm={() => deleteMsgId && deleteMsgMutation.mutate(deleteMsgId)}
+        onCancel={() => setDeleteMsgId(null)}
+      />
     </div>
   );
 }

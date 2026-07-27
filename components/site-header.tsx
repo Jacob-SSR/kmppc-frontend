@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/queries";
 import { initial } from "@/lib/format";
@@ -60,6 +61,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {me.data ? (
             <Link href="/dashboard" className="hidden sm:block">
               <Button variant="outline">
