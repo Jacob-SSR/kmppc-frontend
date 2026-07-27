@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import {
   Bell,
   Bookmark,
+  Bug,
   FileText,
   Home,
   MessageCircle,
@@ -28,6 +29,7 @@ const sidebarItems = [
   { href: "/bookmarks", label: "บุ๊คมาร์ค", icon: Bookmark },
   { href: "/notifications", label: "แจ้งเตือน", icon: Bell },
   { href: "/profile", label: "โปรไฟล์", icon: User },
+  { href: "/report-issue", label: "แจ้งปัญหา", icon: Bug },
   { href: "/admin", label: "แอดมิน", icon: ShieldCheck, adminOnly: true },
 ];
 

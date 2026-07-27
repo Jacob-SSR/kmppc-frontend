@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RichText } from "@/components/rich-text";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useNotifications, type AppNotification } from "@/lib/queries";
@@ -121,7 +122,10 @@ export default function NotificationsPage() {
                 >
                   {n.title}
                 </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">{n.message}</p>
+                {/* render ลิงก์/รูปในข้อความได้ (ใช้กับแจ้งปัญหาที่แนบรูปมา) */}
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
+                  <RichText text={n.message} />
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {timeAgo(n.created_at)}
                 </p>
@@ -131,7 +135,9 @@ export default function NotificationsPage() {
               )}
             </Card>
           );
-          return n.url ? (
+          // ข้อความที่มีลิงก์/รูปในตัว (เช่นแจ้งปัญหา) ห้ามครอบด้วย <a> ซ้อน <a>
+          const hasInlineLinks = /\]\(|https?:\/\//.test(n.message);
+          return n.url && !hasInlineLinks ? (
             <Link key={n.id} href={n.url} className="block" onClick={() => open(n)}>
               {card}
             </Link>
