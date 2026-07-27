@@ -16,7 +16,7 @@ const channels = [
   {
     icon: Phone,
     title: "โทรศัพท์ภายใน",
-    lines: ["แผนก IT: 306"],
+    lines: ["ศูนย์คอมพิวเตอร์: 306"],
   },
   {
     icon: Mail,
@@ -25,8 +25,11 @@ const channels = [
   },
   {
     icon: MapPin,
-    title: "ที่ตั้งแผนก",
-    lines: ["อาคารอำนวยการ ชั้น 2", "ห้องเทคโนโลยีสารสนเทศ"],
+    title: "ที่ตั้งศูนย์คอมพิวเตอร์",
+    lines: [
+      "ตึกกลาง ห้องศูนย์คอมพิวเตอร์ (ที่ทำการหลัก)",
+      "ตึก OPD ชั้น 2 ห้อง Server",
+    ],
   },
   {
     icon: Clock,
@@ -87,7 +90,7 @@ export default function ContactPage() {
         <div className="mx-auto max-w-5xl px-4 py-12 lg:px-6">
           <h1 className="text-3xl font-bold text-primary-dark">ติดต่อเรา</h1>
           <p className="mt-2 text-muted-foreground">
-            พบปัญหาการใช้งานระบบ หรือมีข้อเสนอแนะ ติดต่อแผนกเทคโนโลยีสารสนเทศได้ทุกช่องทาง
+            พบปัญหาการใช้งานระบบ หรือมีข้อเสนอแนะ ติดต่อศูนย์คอมพิวเตอร์ได้ทุกช่องทาง
           </p>
         </div>
       </section>

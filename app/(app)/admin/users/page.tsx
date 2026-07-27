@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="ค้นหาชื่อ, username, รหัสพนักงาน..."
+            placeholder="ค้นหาชื่อ, username..."
             className="pl-9"
           />
         </div>
@@ -86,7 +86,6 @@ export default function AdminUsersPage() {
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-5 py-3 font-medium">ผู้ใช้งาน</th>
-                <th className="px-5 py-3 font-medium">รหัสพนักงาน</th>
                 <th className="px-5 py-3 font-medium">แผนก</th>
                 <th className="px-5 py-3 font-medium">สิทธิ</th>
                 <th className="px-5 py-3 font-medium">สถานะ</th>
@@ -111,9 +110,6 @@ export default function AdminUsersPage() {
                         </p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {u.employee_no}
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">
                     {u.department.dept_name}
@@ -181,7 +177,7 @@ export default function AdminUsersPage() {
               {users.data?.items.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-5 py-8 text-center text-muted-foreground"
                   >
                     ไม่พบผู้ใช้งานที่ค้นหา
