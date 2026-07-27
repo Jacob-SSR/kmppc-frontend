@@ -323,6 +323,14 @@ function ChatContent() {
     return c.members.find((m) => m.user.id !== me.data?.id)?.user.id ?? null;
   }
 
+  function directOtherImage(c: Conversation): string | null {
+    if (c.type === "GROUP") return null;
+    return (
+      c.members.find((m) => m.user.id !== me.data?.id)?.user.profile_image ??
+      null
+    );
+  }
+
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* รายชื่อการสนทนา */}
@@ -470,7 +478,7 @@ function ChatContent() {
                     )}
                   >
                     <div className="relative">
-                      <Avatar name={name} />
+                      <Avatar name={name} src={u.profile_image} />
                       {isOnline(u.id) && (
                         <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
                       )}
@@ -555,7 +563,7 @@ function ChatContent() {
                         <Users className="h-5 w-5" />
                       </span>
                     ) : (
-                      <Avatar name={name} />
+                      <Avatar name={name} src={directOtherImage(c)} />
                     )}
                     {isOnline(otherId) && (
                       <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
@@ -604,7 +612,10 @@ function ChatContent() {
                 </span>
               ) : (
                 <div className="relative">
-                  <Avatar name={conversationName(active, me.data?.id)} />
+                  <Avatar
+                    name={conversationName(active, me.data?.id)}
+                    src={directOtherImage(active)}
+                  />
                   {isOnline(directOtherId(active)) && (
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-emerald-500" />
                   )}
@@ -647,7 +658,13 @@ function ChatContent() {
                       mine && "flex-row-reverse",
                     )}
                   >
-                    {!mine && <Avatar name={fullName(m.sender)} size="sm" />}
+                    {!mine && (
+                      <Avatar
+                        name={fullName(m.sender)}
+                        src={m.sender.profile_image}
+                        size="sm"
+                      />
+                    )}
                     <div
                       className={cn(
                         "max-w-[70%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",

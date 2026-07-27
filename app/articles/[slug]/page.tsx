@@ -529,7 +529,7 @@ export default function ArticleDetailPage() {
                 const name = fullName(c.user);
                 return (
                   <div key={c.id} className="flex gap-3">
-                    <Avatar name={name} size="sm" />
+                    <Avatar name={name} src={c.user.profile_image} size="sm" />
                     <div className="flex-1 rounded-xl bg-muted p-3.5">
                       <div className="flex items-center justify-between gap-2">
                         {c.user.id ? (

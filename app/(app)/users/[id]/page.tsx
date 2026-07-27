@@ -51,7 +51,7 @@ export default function UserProfilePage() {
       <Card className="overflow-hidden">
         <div className="h-24 bg-gradient-to-r from-secondary via-accent/70 to-secondary" />
         <div className="-mt-10 px-6 pb-6 text-center">
-          <Avatar name={displayName} size="lg" className="mx-auto ring-4 ring-card" />
+          <Avatar name={displayName} src={p.profile_image} size="lg" className="mx-auto ring-4 ring-card" />
           <h1 className="mt-3 text-2xl font-bold">{displayName}</h1>
           {/* ชื่อจริงเห็นเฉพาะในหน้าโปรไฟล์ (สไตล์เฟซบุ๊ก) */}
           {p.display_name && (

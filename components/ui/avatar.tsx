@@ -10,10 +10,13 @@ const tones = [
 
 export function Avatar({
   name,
+  src,
   size = "md",
   className,
 }: {
   name: string;
+  /** URL รูปโปรไฟล์ — มีรูปโชว์รูป ไม่มีโชว์อักษรย่อเหมือนเดิม */
+  src?: string | null;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
@@ -23,6 +26,20 @@ export function Avatar({
     md: "h-10 w-10 text-sm",
     lg: "h-16 w-16 text-xl",
   };
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        className={cn(
+          "shrink-0 rounded-full object-cover",
+          sizes[size],
+          className,
+        )}
+      />
+    );
+  }
   return (
     <span
       className={cn(

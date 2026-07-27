@@ -70,9 +70,18 @@ export default function AppLayout({
               )}
             </Link>
             <Link href="/profile" className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
-                {me.data ? initial(me.data.fname) : "…"}
-              </span>
+              {me.data?.profile_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={me.data.profile_image}
+                  alt="รูปโปรไฟล์"
+                  className="h-9 w-9 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
+                  {me.data ? initial(me.data.fname) : "…"}
+                </span>
+              )}
               <span className="hidden text-left leading-tight sm:block">
                 <span className="block text-sm font-semibold">
                   {me.data ? `คุณ${me.data.fname}` : "กำลังโหลด..."}

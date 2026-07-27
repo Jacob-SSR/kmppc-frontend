@@ -87,7 +87,7 @@ export default function AdminUsersPage() {
                 >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <Avatar name={u.fname} size="sm" />
+                      <Avatar name={u.fname} src={u.profile_image} size="sm" />
                       <div>
                         <p className="font-medium">
                           {u.fname} {u.lname}

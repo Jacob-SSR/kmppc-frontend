@@ -306,7 +306,7 @@ export default function DiscussionDetailPage() {
             <VenetianMask className="h-4 w-4" />
           </span>
         ) : (
-          <Avatar name={name} size="sm" />
+          <Avatar name={name} src={r.author.profile_image} size="sm" />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
@@ -387,7 +387,7 @@ export default function DiscussionDetailPage() {
                 <VenetianMask className="h-5 w-5" />
               </span>
             ) : (
-              <Avatar name={authorName} />
+              <Avatar name={authorName} src={d.author.profile_image} />
             )}
             <div className="text-sm">
               {!me.isError && !d.is_anonymous && d.author.id ? (

@@ -145,7 +145,7 @@ export default function DiscussionsPage() {
                           <VenetianMask className="h-5 w-5" />
                         </span>
                       ) : (
-                        <Avatar name={name} />
+                        <Avatar name={name} src={d.author.profile_image} />
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">

@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
+  Camera,
   IdCard,
   KeyRound,
   LogOut,
@@ -14,6 +15,7 @@ import {
   Send,
   ShieldCheck,
   UserRound,
+  X,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,55 @@ function ProfileContent({ user: u }: { user: Me }) {
     position: u.position ?? "",
   });
   const [errors, setErrors] = useState<Errors>({});
+
+  // ---------- รูปโปรไฟล์ ----------
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const avatarMutation = useMutation({
+    mutationFn: async (payload: {
+      url: string | null;
+      public_id: string | null;
+    }) =>
+      api.patch("/users/me", {
+        profile_image: payload.url,
+        profile_image_public_id: payload.public_id,
+      }),
+    onSuccess: (_, vars) => {
+      toast.success(vars.url ? "เปลี่ยนรูปโปรไฟล์แล้ว" : "ลบรูปโปรไฟล์แล้ว");
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+    onError: (err) =>
+      toast.error("บันทึกรูปโปรไฟล์ไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
+  async function handleAvatar(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("รูปโปรไฟล์ต้องเป็นไฟล์รูปภาพ");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("รูปใหญ่เกิน 10MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post<{ url: string; public_id: string }>(
+        "/upload",
+        formData,
+      );
+      avatarMutation.mutate({ url: data.url, public_id: data.public_id });
+    } catch (err) {
+      toast.error("อัปโหลดรูปไม่สำเร็จ", getApiErrorMessage(err));
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: async () =>
@@ -92,7 +143,44 @@ function ProfileContent({ user: u }: { user: Me }) {
     <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
       {/* บัตรโปรไฟล์ */}
       <Card className="p-6 text-center">
-        <Avatar name={u.display_name || u.fname} size="lg" className="mx-auto" />
+        <div className="relative mx-auto w-fit">
+          <Avatar
+            name={u.display_name || u.fname}
+            src={u.profile_image}
+            size="lg"
+          />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleAvatar(e.target.files)}
+          />
+          <button
+            type="button"
+            aria-label="เปลี่ยนรูปโปรไฟล์"
+            title="เปลี่ยนรูปโปรไฟล์"
+            disabled={uploadingAvatar}
+            onClick={() => avatarInputRef.current?.click()}
+            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow ring-2 ring-card transition-colors hover:bg-primary-dark disabled:opacity-60"
+          >
+            <Camera className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {uploadingAvatar && (
+          <p className="mt-2 text-xs text-muted-foreground">กำลังอัปโหลดรูป...</p>
+        )}
+        {u.profile_image && !uploadingAvatar && (
+          <button
+            type="button"
+            onClick={() =>
+              avatarMutation.mutate({ url: null, public_id: null })
+            }
+            className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
+          >
+            <X className="h-3 w-3" /> ลบรูปโปรไฟล์
+          </button>
+        )}
         <p className="mt-3 font-bold">{u.display_name || `${u.fname} ${u.lname}`}</p>
         {u.display_name && (
           <p className="text-xs text-muted-foreground">
