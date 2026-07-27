@@ -201,6 +201,25 @@ function ChatContent() {
     onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
   });
 
+  // ---------- คำขอส่งข้อความ (ทักคนที่ยังไม่เป็นเพื่อน) ----------
+  const acceptRequestMutation = useMutation({
+    mutationFn: async () => api.post(`/chat/conversations/${activeId}/accept`),
+    onSuccess: () => {
+      toast.success("ตอบรับแล้ว", "เริ่มคุยกันได้เลย");
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+  const declineRequestMutation = useMutation({
+    mutationFn: async () => api.post(`/chat/conversations/${activeId}/decline`),
+    onSuccess: () => {
+      toast.success("ปฏิเสธคำขอแล้ว");
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err) => toast.error("ทำรายการไม่สำเร็จ", getApiErrorMessage(err)),
+  });
+
   // ---------- จัดการสมาชิกกลุ่ม ----------
   const [showMembers, setShowMembers] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -427,6 +446,11 @@ function ChatContent() {
 
   // เรียงเก่า → ใหม่ (API ส่งใหม่ → เก่า)
   const thread = [...(messages.data?.items ?? [])].reverse();
+  // ผู้ส่งคำขอที่ส่งข้อความแรกไปแล้ว — ล็อกช่องพิมพ์จนกว่าอีกฝ่ายจะตอบรับ
+  const requestLocked =
+    !!active?.is_request &&
+    active.requested_by === me.data?.id &&
+    thread.some((m) => m.sender.id === me.data?.id);
 
   function isOnline(userId: string | null | undefined): boolean {
     return !!userId && onlineIds.has(userId);
@@ -778,7 +802,9 @@ function ChatContent() {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-xs text-muted-foreground">
-                        {c.last_message?.message ?? "ยังไม่มีข้อความ"}
+                        {c.is_request
+                          ? "📨 คำขอส่งข้อความ"
+                          : (c.last_message?.message ?? "ยังไม่มีข้อความ")}
                       </p>
                       {c.unread_count > 0 && (
                         <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
@@ -1034,6 +1060,43 @@ function ChatContent() {
               <div ref={bottomRef} />
             </div>
 
+            {/* แถบคำขอส่งข้อความ */}
+            {active.is_request && (
+              <div className="border-t border-border bg-secondary/50 px-5 py-3 text-sm">
+                {active.requested_by === me.data?.id ? (
+                  <p className="text-muted-foreground">
+                    📨 นี่คือคำขอส่งข้อความ — ส่งได้ 1 ข้อความ
+                    รออีกฝ่ายตอบรับแล้วจึงคุยต่อได้ (ไม่ต้องเป็นเพื่อนกันก่อน)
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="min-w-0 flex-1 text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {conversationName(active, me.data?.id)}
+                      </span>{" "}
+                      ส่งคำขอคุยกับคุณ — ตอบรับเพื่อเริ่มแชท
+                      (หรือพิมพ์ตอบ = ตอบรับทันที)
+                    </p>
+                    <Button
+                      size="sm"
+                      loading={acceptRequestMutation.isPending}
+                      onClick={() => acceptRequestMutation.mutate()}
+                    >
+                      ตอบรับ
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:bg-destructive/5"
+                      loading={declineRequestMutation.isPending}
+                      onClick={() => declineRequestMutation.mutate()}
+                    >
+                      ปฏิเสธ
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             {editingMsg && (
               <div className="flex items-center justify-between gap-2 border-t border-border bg-secondary/60 px-4 py-2 text-xs">
                 <span className="flex items-center gap-1.5 text-primary-dark">
@@ -1076,11 +1139,15 @@ function ChatContent() {
                 disabled={sendMutation.isPending}
               />
               <Input
-                placeholder="พิมพ์ข้อความ..."
+                placeholder={
+                  requestLocked
+                    ? "รออีกฝ่ายตอบรับก่อนจึงจะส่งเพิ่มได้..."
+                    : "พิมพ์ข้อความ..."
+                }
                 className="flex-1"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                disabled={sendMutation.isPending}
+                disabled={sendMutation.isPending || requestLocked}
               />
               <Button
                 type="submit"

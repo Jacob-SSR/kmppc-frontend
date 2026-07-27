@@ -32,6 +32,26 @@ export type UserProfile = {
   created_at: string;
   department: { id: string; dept_name: string } | null;
   _count: { articles: number; discussions: number };
+  // ผลงานล่าสุด (บทความเผยแพร่ / กระทู้ไม่ anonymous)
+  articles: {
+    id: string;
+    slug: string;
+    title: string;
+    cover_image: string | null;
+    view_count: number;
+    published_at: string | null;
+    category: { category_name: string };
+    _count: { comments: number; likes: number };
+  }[];
+  discussions: {
+    id: string;
+    title: string;
+    is_solved: boolean;
+    view_count: number;
+    created_at: string;
+    category: { category_name: string };
+    _count: { replies: number; likes: number };
+  }[];
 };
 
 export type Department = {
@@ -155,6 +175,9 @@ export type Conversation = {
   id: string;
   type: "DIRECT" | "GROUP";
   name: string | null;
+  // คำขอส่งข้อความ (ทักคนที่ยังไม่เป็นเพื่อน) — รอปลายทางตอบรับ
+  is_request?: boolean;
+  requested_by?: string | null;
   updated_at: string;
   members: {
     is_admin?: boolean;
