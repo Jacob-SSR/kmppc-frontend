@@ -158,7 +158,7 @@ export default function RegisterPage() {
             <Input
               id="display_name"
               name="display_name"
-              placeholder="เช่น หมอต้นไม้, พี่หมี IT"
+              placeholder="ตั้งชื่อที่อยากให้แสดง (ไม่บังคับ)"
               value={values.display_name}
               onChange={(e) => setValue("display_name", e.target.value)}
               disabled={submitting}

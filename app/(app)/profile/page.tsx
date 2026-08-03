@@ -232,7 +232,7 @@ function ProfileContent({ user: u }: { user: Me }) {
             >
               <Input
                 id="display_name"
-                placeholder="เช่น หมอต้นไม้, พี่หมี IT"
+                placeholder="ตั้งชื่อที่อยากให้แสดง (เว้นว่าง = ชื่อจริง)"
                 value={form.display_name}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, display_name: e.target.value }))
