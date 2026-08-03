@@ -19,3 +19,13 @@ export function getChatSocket(): Socket {
   });
   return socket;
 }
+
+/**
+ * ตัดการเชื่อมต่อและทิ้ง socket เดิม — ต้องเรียกทุกครั้งที่ login/logout
+ * ไม่งั้น socket ค้าง auth ของ user เก่า (backend ผูก userId ตอน handshake)
+ * แล้วข้อความที่ส่งจะถูกบันทึกเป็นของ user คนก่อน
+ */
+export function resetChatSocket(): void {
+  socket?.disconnect();
+  socket = null;
+}

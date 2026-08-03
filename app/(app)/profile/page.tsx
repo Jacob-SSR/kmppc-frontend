@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { useMe, type Me } from "@/lib/queries";
+import { resetChatSocket } from "@/lib/socket";
 import { collectErrors, required, runRules } from "@/lib/validation";
 
 type Errors = Partial<Record<"fname" | "lname", string>>;
@@ -121,6 +122,8 @@ function ProfileContent({ user: u }: { user: Me }) {
   const logoutMutation = useMutation({
     mutationFn: async () => api.post("/auth/logout-all"),
     onSuccess: () => {
+      // ตัด socket แชททิ้ง — ไม่งั้น login บัญชีใหม่แล้ว socket ยังเป็น user เดิม
+      resetChatSocket();
       queryClient.clear();
       toast.success("ออกจากระบบแล้ว");
       router.push("/login");

@@ -10,6 +10,7 @@ import { FormField, fieldInvalidClass } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { api, getApiErrorMessage } from "@/lib/api";
+import { resetChatSocket } from "@/lib/socket";
 import { collectErrors, required, runRules } from "@/lib/validation";
 
 type Errors = Partial<Record<"username" | "password", string>>;
@@ -40,6 +41,8 @@ export default function LoginPage() {
         password,
         remember,
       });
+      // socket แชทอาจค้าง auth ของ user เดิมอยู่ — ตัดทิ้งให้ต่อใหม่ด้วย cookie ปัจจุบัน
+      resetChatSocket();
       toast.success("เข้าสู่ระบบสำเร็จ", "ยินดีต้อนรับกลับสู่ระบบ KM");
       router.push("/dashboard");
     } catch (err) {
