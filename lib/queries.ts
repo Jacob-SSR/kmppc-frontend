@@ -100,6 +100,9 @@ export type Article = {
   file_download_count?: number;
 };
 
+/** รายการบทความจาก endpoint แบบ list — backend ไม่ส่ง `content` เต็มแล้ว (ลดขนาด response) */
+export type ArticleListItem = Omit<Article, "content">;
+
 export type ArticleComment = {
   id: string;
   content: string;
@@ -297,7 +300,7 @@ export function useArticles(params: ListParams = {}) {
   return useQuery({
     queryKey: ["articles", params],
     queryFn: async () =>
-      (await api.get<Paginated<Article>>("/articles", { params })).data,
+      (await api.get<Paginated<ArticleListItem>>("/articles", { params })).data,
     placeholderData: keepPreviousData,
   });
 }
@@ -306,7 +309,8 @@ export function useArticles(params: ListParams = {}) {
 export function useMyArticles() {
   return useQuery({
     queryKey: ["my-articles"],
-    queryFn: async () => (await api.get<Article[]>("/articles/mine")).data,
+    queryFn: async () =>
+      (await api.get<ArticleListItem[]>("/articles/mine")).data,
     retry: false,
   });
 }
